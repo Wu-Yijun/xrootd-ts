@@ -319,32 +319,35 @@ XRootD 支持在单个 TCP 连接上建立多个并行子流。主流程（subSt
 
 **优先级：P1**
 
-文件操作类，核心 API。每个操作都有异步（回调）和同步（阻塞）两个版本。
+文件操作类，核心 API。TypeScript 版使用 async/await + throw 异常（详见 [docs/typescript-design.md](typescript-design.md)）。
 
 ```typescript
-class XrdClFile {
-  // 核心操作（必须实现）
-  open(path: string, flags: OpenFlags, mode?: OpenMode): Promise<Status>;
-  close(): Promise<Status>;
-  read(offset: number, size: number): Promise<[Status, Uint8Array]>;
-  write(offset: number, data: Uint8Array): Promise<Status>;
-  stat(infoType?: StatInfoEnum): Promise<[Status, StatInfo]>;
-  sync(): Promise<Status>;
-  truncate(size: number): Promise<Status>;
+class File {
+  constructor(url?: string)
+
+  // 核心操作（必须实现）— 失败时 throw XRootDError
+  open(url: string, options?: OpenOptions): Promise<void>;
+  open(options?: OpenOptions): Promise<void>;
+  close(): Promise<void>;
+  read(offset: number, size: number): Promise<Uint8Array>;
+  write(offset: number, data: Uint8Array): Promise<number>;
+  stat(infoType?: StatInfoEnum): Promise<StatInfo>;
+  sync(): Promise<void>;
+  truncate(size: number): Promise<void>;
 
   // 向量 I/O（推荐实现）
-  vectorRead(chunks: ChunkInfo[]): Promise<[Status, ChunkInfo[]]>;
-  vectorWrite(chunks: ChunkInfo[]): Promise<Status>;
+  vectorRead(chunks: ChunkInfo[]): Promise<ChunkInfo[]>;
+  vectorWrite(chunks: ChunkInfo[]): Promise<number>;
 
   // 页面校验读写（可选）
-  pgRead(offset: number, size: number): Promise<[Status, Uint8Array, Uint32Array]>;
-  pgWrite(offset: number, data: Uint8Array): Promise<Status>;
+  pgRead(offset: number, size: number): Promise<{ data: Uint8Array; crc: Uint32Array }>;
+  pgWrite(offset: number, data: Uint8Array): Promise<void>;
 
   // 扩展属性（可选）
-  setXAttr(attrs: ExtendedAttributes): Promise<Status>;
-  getXAttr(attrs: string[]): Promise<[Status, ExtendedAttributes]>;
-  delXAttr(attrs: string[]): Promise<Status>;
-  listXAttr(): Promise<[Status, string[]]>;
+  setXAttr(attrs: ExtendedAttributes): Promise<void>;
+  getXAttr(attrs: string[]): Promise<ExtendedAttributes>;
+  delXAttr(attrs: string[]): Promise<void>;
+  listXAttr(): Promise<string[]>;
 
   // 高级操作（可选）
   fcntl(...): Promise<Status>;
@@ -356,44 +359,46 @@ class XrdClFile {
 
 **优先级：P2**
 
-文件系统元数据操作，无状态。
+文件系统元数据操作，无状态。TypeScript 版使用 async/await + throw 异常。
 
 ```typescript
-class XrdClFileSystem {
+class FileSystem {
+  constructor(url: string)
+
   // 定位
-  locate(path: string, flags: LocateFlags): Promise<[Status, LocationInfo]>;
-  deepLocate(path: string, flags: LocateFlags): Promise<[Status, LocationList]>;
+  locate(path: string, flags?: LocateFlags): Promise<LocationInfo>;
+  deepLocate(path: string, flags?: LocateFlags): Promise<LocationList>;
 
   // 元数据
-  stat(path: string, infoType?: StatInfoEnum): Promise<[Status, StatInfo]>;
-  statVFS(path: string): Promise<[Status, StatVFSInfo]>;
-  protocol(): Promise<[Status, ProtocolInfo]>;
+  stat(path: string, infoType?: StatInfoEnum): Promise<StatInfo>;
+  statVFS(path: string): Promise<StatVFSInfo>;
+  protocol(): Promise<ProtocolInfo>;
 
   // 目录操作
-  dirList(path: string, flags?: DirListFlags): Promise<[Status, DirectoryList]>;
-  mkDir(path: string, mode?: number): Promise<Status>;
-  rmDir(path: string): Promise<Status>;
+  readdir(path: string, flags?: DirListFlags): Promise<DirectoryList>;
+  mkdir(path: string, mode?: number): Promise<void>;
+  rmdir(path: string): Promise<void>;
 
   // 文件管理
-  mv(src: string, dst: string): Promise<Status>;
-  rm(path: string): Promise<Status>;
-  truncate(path: string, size: number): Promise<Status>;
-  chmod(path: string, mode: number): Promise<Status>;
+  rename(src: string, dst: string): Promise<void>;
+  rm(path: string): Promise<void>;
+  truncate(path: string, size: number): Promise<void>;
+  chmod(path: string, mode: number): Promise<void>;
 
   // 查询
-  query(queryCode: QueryCode, data?: Uint8Array): Promise<[Status, Uint8Array]>;
-  ping(): Promise<Status>;
-  sendInfo(info: string): Promise<Status>;
-  sendCache(path: string): Promise<Status>;
+  query(queryCode: string, data?: Uint8Array): Promise<Uint8Array>;
+  ping(): Promise<void>;
+  sendInfo(info: string): Promise<void>;
+  sendCache(path: string): Promise<void>;
 
   // 预取
-  prepare(...): Promise<Status>;
+  prepare(path: string): Promise<void>;
 
   // 扩展属性
-  setXAttr(path: string, attrs: ExtendedAttributes): Promise<Status>;
-  getXAttr(path: string, attrs: string[]): Promise<[Status, ExtendedAttributes]>;
-  delXAttr(path: string, attrs: string[]): Promise<Status>;
-  listXAttr(path: string): Promise<[Status, string[]]>;
+  setXAttr(path: string, attrs: ExtendedAttributes): Promise<void>;
+  getXAttr(path: string, attrs: string[]): Promise<ExtendedAttributes>;
+  delXAttr(path: string, attrs: string[]): Promise<void>;
+  listXAttr(path: string): Promise<string[]>;
 }
 ```
 
