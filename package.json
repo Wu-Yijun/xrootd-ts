@@ -11,6 +11,7 @@
     }
   },
   "scripts": {
+    "preinstall": "npx only-allow pnpm",
     "build": "tsdown",
     "dev": "tsdown --watch",
     "typecheck": "tsc --noEmit",
