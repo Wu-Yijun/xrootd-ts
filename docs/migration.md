@@ -706,27 +706,7 @@ GSI 握手流程：
 
 ### 9.2 Rust 方案
 
-| 原模块功能 | 推荐替代方案 | 说明 |
-|-----------|-------------|------|
-| **TCP 连接** | `tokio::net::TcpStream` | 异步运行时 |
-| **TLS 加密** | `rustls` / `openssl` | 推荐 rustls |
-| **异步运行时** | `tokio` / `async-std` | — |
-| **加密原语** | `ring` / `openssl` | ring 更安全，openssl 更全面 |
-| **X.509 证书** | `x509-parser` / `rustls-pemfile` | — |
-| **证书链验证** | `rustls` / `webpki` | — |
-| **字节序转换** | `byteorder` / `bytes` | — |
-| **错误处理** | `thiserror` / `anyhow` | — |
-| **序列化/反序列化** | `bincode` / `serde` | 协议帧映射 |
-| **并发** | `tokio::spawn` / `futures` | — |
-| **FFI (ISA-L)** | `isal-sys` / `libc` | 纠删码可选 |
-| **日志** | `tracing` / `log` | — |
-| **测试** | 内置 `#[test]` | — |
-
-**Rust 天然优势**：
-- 零拷贝解析，适合二进制协议
-- `#[repr(C)]` 结构体直接映射协议帧
-- 无 GC，适合高性能存储场景
-- `Pin` + `Future` 精确控制异步生命周期
+> 详细的 Rust 依赖清单和架构设计参见 [附录 A: Rust 方案参考](#附录-a-rust-方案参考)。
 
 ---
 
@@ -1241,56 +1221,7 @@ xrootd-client/
 
 ### 11.2 Rust 推荐架构
 
-```
-xrootd-rs/
-├── crates/
-│   ├── xrootd-protocol/       # 协议帧定义、零拷贝编解码
-│   │   ├── src/
-│   │   │   ├── lib.rs
-│   │   │   ├── types.rs       # 基础类型
-│   │   │   ├── codec.rs       # 编解码（byteorder）
-│   │   │   ├── request.rs     # 请求结构体
-│   │   │   ├── response.rs    # 响应结构体
-│   │   │   └── constants.rs   # 常量
-│   │   └── Cargo.toml
-│   │
-│   ├── xrootd-transport/      # TCP/TLS 连接、异步读写
-│   │   ├── src/
-│   │   │   ├── lib.rs
-│   │   │   ├── socket.rs      # TCP 连接
-│   │   │   ├── tls.rs         # TLS 支持
-│   │   │   ├── message.rs     # 消息封装
-│   │   │   └── handler.rs     # 异步处理器
-│   │   └── Cargo.toml
-│   │
-│   ├── xrootd-security/       # 安全协议框架 + SSS/host
-│   │   ├── src/
-│   │   │   ├── lib.rs
-│   │   │   ├── interface.rs   # SecurityProtocol trait
-│   │   │   ├── host.rs        # host 认证
-│   │   │   └── sss.rs         # SSS 认证
-│   │   └── Cargo.toml
-│   │
-│   ├── xrootd-client/         # 高层 API
-│   │   ├── src/
-│   │   │   ├── lib.rs
-│   │   │   ├── file.rs        # File 结构体
-│   │   │   ├── filesystem.rs  # FileSystem 结构体
-│   │   │   ├── copy.rs        # CopyProcess
-│   │   │   ├── url.rs         # URL 解析
-│   │   │   ├── channel.rs     # Channel
-│   │   │   ├── postmaster.rs  # PostMaster
-│   │   │   └── error.rs       # 错误类型
-│   │   └── Cargo.toml
-│   │
-│   └── xrootd-gsi/            # (可选) GSI/X.509 认证
-│       ├── src/
-│       │   └── lib.rs
-│       └── Cargo.toml
-│
-├── Cargo.toml (workspace)
-└── README.md
-```
+> 详细的 Rust 架构和 crate 设计参见 [附录 A: Rust 方案参考](#附录-a-rust-方案参考)。
 
 ---
 
@@ -1407,3 +1338,97 @@ src/url/url.ts                 # URL 解析
 - 加密工具: `src/XrdCrypto/` — 密码学抽象层
 - 测试参考: `tests/` 目录下的功能测试用例
 - 模块分析: `docs/xrootd/index.md` — 各模块详细分析报告
+- TypeScript API 设计: `docs/typescript-design.md` — TypeScript 原生 API 设计
+
+---
+
+## 附录 A: Rust 方案参考
+
+### A.1 Rust 依赖清单
+
+| 原模块功能 | 推荐替代方案 | 说明 |
+|-----------|-------------|------|
+| **TCP 连接** | `tokio::net::TcpStream` | 异步运行时 |
+| **TLS 加密** | `rustls` / `openssl` | 推荐 rustls |
+| **异步运行时** | `tokio` / `async-std` | — |
+| **加密原语** | `ring` / `openssl` | ring 更安全，openssl 更全面 |
+| **X.509 证书** | `x509-parser` / `rustls-pemfile` | — |
+| **证书链验证** | `rustls` / `webpki` | — |
+| **字节序转换** | `byteorder` / `bytes` | — |
+| **错误处理** | `thiserror` / `anyhow` | — |
+| **序列化/反序列化** | `bincode` / `serde` | 协议帧映射 |
+| **并发** | `tokio::spawn` / `futures` | — |
+| **FFI (ISA-L)** | `isal-sys` / `libc` | 纠删码可选 |
+| **日志** | `tracing` / `log` | — |
+| **测试** | 内置 `#[test]` | — |
+
+**Rust 天然优势**：
+- 零拷贝解析，适合二进制协议
+- `#[repr(C)]` 结构体直接映射协议帧
+- 无 GC，适合高性能存储场景
+- `Pin` + `Future` 精确控制异步生命周期
+
+### A.2 Rust 推荐架构
+
+```
+xrootd-rs/
+├── crates/
+│   ├── xrootd-protocol/       # 协议帧定义、零拷贝编解码
+│   │   ├── src/
+│   │   │   ├── lib.rs
+│   │   │   ├── types.rs       # 基础类型
+│   │   │   ├── codec.rs       # 编解码（byteorder）
+│   │   │   ├── request.rs     # 请求结构体
+│   │   │   ├── response.rs    # 响应结构体
+│   │   │   └── constants.rs   # 常量
+│   │   └── Cargo.toml
+│   │
+│   ├── xrootd-transport/      # TCP/TLS 连接、异步读写
+│   │   ├── src/
+│   │   │   ├── lib.rs
+│   │   │   ├── socket.rs      # TCP 连接
+│   │   │   ├── tls.rs         # TLS 支持
+│   │   │   ├── message.rs     # 消息封装
+│   │   │   └── handler.rs     # 异步处理器
+│   │   └── Cargo.toml
+│   │
+│   ├── xrootd-security/       # 安全协议框架 + SSS/host
+│   │   ├── src/
+│   │   │   ├── lib.rs
+│   │   │   ├── interface.rs   # SecurityProtocol trait
+│   │   │   ├── host.rs        # host 认证
+│   │   │   └── sss.rs         # SSS 认证
+│   │   └── Cargo.toml
+│   │
+│   ├── xrootd-client/         # 高层 API
+│   │   ├── src/
+│   │   │   ├── lib.rs
+│   │   │   ├── file.rs        # File 结构体
+│   │   │   ├── filesystem.rs  # FileSystem 结构体
+│   │   │   ├── copy.rs        # CopyProcess
+│   │   │   ├── url.rs         # URL 解析
+│   │   │   ├── channel.rs     # Channel
+│   │   │   ├── postmaster.rs  # PostMaster
+│   │   │   └── error.rs       # 错误类型
+│   │   └── Cargo.toml
+│   │
+│   └── xrootd-gsi/            # (可选) GSI/X.509 认证
+│       ├── src/
+│       │   └── lib.rs
+│       └── Cargo.toml
+│
+├── Cargo.toml (workspace)
+└── README.md
+```
+
+### A.3 TypeScript vs Rust 对比
+
+| 方面 | TypeScript | Rust |
+|------|-----------|------|
+| **开发速度** | 快，类型安全 | 较慢，所有权系统 |
+| **性能** | 中等（V8 JIT） | 高（零成本抽象） |
+| **异步模型** | async/await + Event Loop | tokio async/await |
+| **TLS** | `node:tls`（内置） | `rustls` / `openssl` |
+| **字节序处理** | `Buffer` 内置方法 | `byteorder` crate |
+| **适用场景** | 快速原型、Node.js 生态 | 高性能、嵌入式 |
+| **包大小** | 较大（Node.js 运行时） | 小（静态链接） |
