@@ -1,0 +1,45 @@
+{
+  "name": "@xrootd/client",
+  "version": "0.1.0",
+  "description": "A TypeScript client library for the XRootD protocol",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsdown",
+    "dev": "tsdown --watch",
+    "typecheck": "tsc --noEmit",
+    "lint": "tsc --noEmit",
+    "test": "node --experimental-strip-types --test src/**/*.test.ts"
+  },
+  "keywords": [
+    "xrootd",
+    "xroot",
+    "high-energy-physics",
+    "data-transfer",
+    "storage",
+    "protocol"
+  ],
+  "author": "",
+  "packageManager": "pnpm@11.5.2",
+  "license": "LGPL-3.0-or-later",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "files": [
+    "dist",
+    "LICENSE",
+    "README.md"
+  ],
+  "devDependencies": {
+    "@types/node": "^26.0.1",
+    "tsdown": "^0.22.3",
+    "typescript": "^6.0.3"
+  }
+}
