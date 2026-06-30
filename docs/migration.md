@@ -288,6 +288,16 @@ TLS/SSL 加密通信。
 
 **简化方案：** 初版可简化为单子流实现。
 
+**并行流（kXR_bind）：**
+XRootD 支持在单个 TCP 连接上建立多个并行子流。主流程（subStreamId=0）通过 `kXR_login` 建立会话后，并行流通过以下步骤建立：
+
+1. 发送初始握手 + `kXR_protocol`（`expect=kXR_ExpBind`）
+2. 接收服务器握手和协议响应
+3. 发送 `kXR_bind` 请求（携带主会话的 16 字节 sessid）
+4. 服务器返回分配的 `substreamid`（1 字节）
+
+并行流不需重新认证，共享主会话的安全上下文。
+
 ### 5.4 异步 Socket 处理 — `XrdCl/XrdClAsyncSocketHandler.*`
 
 **优先级：P1**
@@ -1382,7 +1392,7 @@ src/api/responses.ts           # XrdClXRootDResponses — 响应类型
 
 2. **Stream ID**：每个请求需要携带 2 字节的 stream ID，用于匹配请求和响应。客户端需要维护一个 stream ID 分配器（递增或随机）。
 
-3. **Session ID**：Login 响应返回 16 字节的 session ID，后续所有请求都需要携带。
+3. **Session ID**：Login 响应返回 16 字节的 session ID。注意：XRootD 协议的请求头（`ClientRequestHdr`）中并不直接携带 session ID，而是通过 `streamid[2]` 来隐式关联会话。session ID 主要用于：`kXR_auth` 认证请求、`kXR_endsess` 结束会话、`kXR_bind` 绑定并行流。客户端需要在内存中维护 `sessionId` 以供这些特殊请求使用。
 
 4. **重定向**：服务器可能返回 `kXR_redirect`，客户端需要能够自动重连到新地址，重新握手+登录+重发请求。
 
@@ -1401,6 +1411,8 @@ src/api/responses.ts           # XrdClXRootDResponses — 响应类型
 11. **空闲连接**：长时间无操作的连接可能被服务器关闭，客户端需要实现心跳保活（kXR_ping）。
 
 12. **并发安全**：多线程/多协程环境下，文件句柄和连接需要适当的同步保护。
+
+13. **TLS 升级**：TLS 在 kXR_protocol 交换期间通过 flags 字段协商。客户端声明 `kXR_ableTLS`，若服务器要求 TLS，客户端重新发送 kXR_protocol（带 `kXR_wantTLS`），然后通过 `node:tls`（TS）或 `rustls`（Rust）升级连接。升级后所有后续数据均加密。
 
 ---
 
