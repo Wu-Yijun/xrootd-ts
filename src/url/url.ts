@@ -72,19 +72,55 @@ export class XRootDUrl {
     port: number
     path: string
   } {
-    const match = url.match(
-      /^(roots?):\/\/(?:(?:([^:]+)(?::([^@]*))?)@)?([^:/]+)(?::(\d+))?(\/.*)?)$/,
-    )
-    if (!match) {
+    const protoMatch = url.match(/^(roots?):\/\//)
+    if (!protoMatch) {
       throw new Error(`Invalid XRootD URL: ${url}`)
     }
 
-    const protocol = match[1]
-    const user = match[2] || undefined
-    const password = match[3] || undefined
-    const host = match[4]
-    const port = match[5] ? parseInt(match[5], 10) : DEFAULT_PORT
-    const path = match[6] || '/'
+    const protocol = protoMatch[1]
+    const rest = url.slice(protoMatch[0].length)
+
+    let auth: string | undefined
+    let hostPort: string
+    let path = '/'
+
+    const atIdx = rest.indexOf('@')
+    if (atIdx !== -1) {
+      auth = rest.slice(0, atIdx)
+      rest.slice(atIdx + 1)
+      hostPort = rest.slice(atIdx + 1)
+    } else {
+      hostPort = rest
+    }
+
+    const slashIdx = hostPort.indexOf('/')
+    if (slashIdx !== -1) {
+      path = hostPort.slice(slashIdx)
+      hostPort = hostPort.slice(0, slashIdx)
+    }
+
+    let user: string | undefined
+    let password: string | undefined
+    if (auth) {
+      const colonIdx = auth.indexOf(':')
+      if (colonIdx !== -1) {
+        user = auth.slice(0, colonIdx)
+        password = auth.slice(colonIdx + 1)
+      } else {
+        user = auth
+      }
+    }
+
+    const colonIdx = hostPort.lastIndexOf(':')
+    let host: string
+    let port = DEFAULT_PORT
+    if (colonIdx !== -1) {
+      host = hostPort.slice(0, colonIdx)
+      const portStr = hostPort.slice(colonIdx + 1)
+      port = portStr ? parseInt(portStr, 10) : DEFAULT_PORT
+    } else {
+      host = hostPort
+    }
 
     if (!host) {
       throw new Error(`Invalid XRootD URL: missing host in "${url}"`)
