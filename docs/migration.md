@@ -118,13 +118,13 @@ interface ClientRequestHdr {
 }
 
 // 2. 握手结构
-// ClientInitHandShake: 20 字节全零（first~fifth 均为 0）
+// ClientInitHandShake: 20 字节
 interface ClientInitHandShake {
   first: number;    // 4 bytes, = 0
   second: number;   // 4 bytes, = 0
   third: number;    // 4 bytes, = 0
-  fourth: number;   // 4 bytes, = 0
-  fifth: number;    // 4 bytes, = 0
+  fourth: number;   // 4 bytes, = htonl(4)
+  fifth: number;    // 4 bytes, = htonl(2012)
 }
 
 // ServerInitHandShake: 12 字节
@@ -136,7 +136,7 @@ interface ServerInitHandShake {
 
 // 3. 33 种请求类型（kXR_login=3007, kXR_open=3010, kXR_read=3013 等）
 // 4. 响应码（kXR_ok=0, kXR_error=4003, kXR_redirect=4004 等）
-// 5. 35 种错误码
+// 5. 36 种错误码
 ```
 
 **协议要点：**
@@ -153,15 +153,26 @@ interface ServerInitHandShake {
 
 **核心状态机：**
 ```
-HandShakeMain:
-  Step 0: GenerateInitialHSProtocol()  → 发送初始握手（20B 全零）
-  Step 1: ProcessServerHS()            ← 接收服务器握手（12B）
-  Step 2: GenerateProtocol()           → 发送 kXR_protocol 请求
-  Step 3: ProcessProtocolResp()        ← 接收协议响应（pval + flags）
-  Step 4: DoAuthentication()           → 执行认证（可选，基于 XrdSec）
-  Step 5: GenerateLogIn()              → 发送 kXR_login 请求
-  Step 6: ProcessLogInResp()           ← 接收登录响应（sessid[16]）
-  Step 7: HandShakeDone()              → 握手完成
+HandShakeMain (主流, subStreamId=0):
+  Disconnected → HandShakeSent
+    动作: 发送初始握手(20B) + kXR_protocol 合并为 44 字节
+  HandShakeSent → HandShakeReceived
+    动作: 接收 ServerResponseHeader(8B) + ServerInitHandShake(12B)
+  HandShakeReceived → LoginSent
+    动作: 处理 kXR_protocol 响应 → 发送 kXR_login
+    注: 若需要 TLS，重新发送 kXR_protocol (带 kXR_wantTLS 标志)
+  LoginSent → AuthSent 或 Connected
+    动作: 接收 kXR_login 响应 (sessid[16] + 可选安全需求)
+    若无需认证 → Connected
+    若需认证 → AuthSent
+  AuthSent → Connected
+    动作: kXR_auth 多轮认证 → kXR_ok
+  重连时: LoginSent → EndSessionSent → Connected
+    动作: 先发 kXR_endsess 结束旧会话
+
+HandShakeParallel (并行流, subStreamId>0):
+  Disconnected → HandShakeSent → HandShakeReceived → BindSent → Connected
+    动作: 初始握手 + kXR_protocol(expect=kXR_ExpBind) → kXR_bind
 ```
 
 **必须实现的方法：**
@@ -1052,41 +1063,42 @@ struct ServerResponseBody_Attn {
 ### 10.5 握手时序（完整）
 
 ```
-客户端                                服务器
-  |                                     |
-  |  1. TCP Connect                     |
-  |───────────────────────────────────>|
-  |                                     |
-  |  2. ClientInitHandShake (20B)       |
-  |     全零: first=0, second=0,        |
-  |     third=0, fourth=0, fifth=0     |
-  |───────────────────────────────────>|
-  |                                     |
-  |  3. ServerInitHandShake (12B)       |
-  |     protover + msgval + msglen      |
-  |<───────────────────────────────────|
-  |                                     |
-  |  4. kXR_protocol 请求               |
-  |     clientpv=0x520, flags=...       |
-  |───────────────────────────────────>|
-  |                                     |
-  |  5. kXR_ok + Protocol 响应          |
-  |     pval + flags + secreq           |
-  |<───────────────────────────────────|
-  |                                     |
-  |  6. [可选] 安全认证握手              |
-  |     kXR_auth 多次往返               |
-  |<─────────────────────────────────>|
-  |                                     |
-  |  7. kXR_login 请求                  |
-  |     username + pid + ability        |
-  |───────────────────────────────────>|
-  |                                     |
-  |  8. kXR_ok + Login 响应             |
-  |     sessid[16] + secToken           |
-  |<───────────────────────────────────|
-  |                                     |
-  |  ===== 会话建立完毕 =====           |
+客户端                                      服务器
+  |  1. TCP Connect                           |
+  |─────────────────────────────────────────>|
+  |                                           |
+  |  2. ClientInitHandShake (20B)             |
+  |     + kXR_protocol (24B)  [合并发送]       |
+  |     first=0, second=0, third=0            |
+  |     fourth=htonl(4), fifth=htonl(2012)    |
+  |     clientpv=0x520, flags=secreqs|bifreqs |
+  |     expect=kXR_ExpLogin                   |
+  |─────────────────────────────────────────>|
+  |                                           |
+  |  3. ServerResponseHeader (8B)             |
+  |     + ServerInitHandShake (12B)           |
+  |     protover + msgval(1=DataServer)       |
+  |<─────────────────────────────────────────|
+  |                                           |
+  |  4. kXR_ok + Protocol Response            |
+  |     pval + flags + secReqs + bifReqs      |
+  |<─────────────────────────────────────────|
+  |                                           |
+  |  5. kXR_login 请求                         |
+  |     pid + username[8] + ability + CGI     |
+  |─────────────────────────────────────────>|
+  |                                           |
+  |  6. kXR_ok + Login Response               |
+  |     sessid[16] + secToken (可选)           |
+  |     (若 body > 16B → 需要认证)              |
+  |<─────────────────────────────────────────|
+  |                                           |
+  |  7. [可选] kXR_auth 多轮认证               |
+  |     kXR_auth → kXR_authmore → ... → kXR_ok|
+  |<────────────────────────────────────────>|
+  |                                           |
+  |  ===== 会话建立完毕 =====                   |
+```
   |                                     |
   |  9. kXR_open 请求                   |
   |     path + flags + mode             |
