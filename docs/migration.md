@@ -22,6 +22,7 @@
 - [十四、MVP 文件清单](#十四mvp-文件清单)
 - [十五、关键注意事项](#十五关键注意事项)
 - [十六、参考资源](#十六参考资源)
+- [附录 A: Rust 方案参考](#附录-a-rust-方案参考)
 
 ---
 
@@ -1256,17 +1257,7 @@ xrootd-client/
 
 > 注：如仅实现 Phase 1-2，即可覆盖 80% 的日常使用场景。
 
-### TypeScript vs Rust 对比
-
-| 方面 | TypeScript | Rust |
-|------|-----------|------|
-| **开发速度** | 快，类型安全 | 较慢，所有权系统 |
-| **性能** | 中等（V8 JIT） | 高（零成本抽象） |
-| **异步模型** | async/await + Event Loop | tokio async/await |
-| **TLS** | `node:tls`（内置） | `rustls` / `openssl` |
-| **字节序处理** | `DataView` / `Buffer` | `byteorder` crate |
-| **适用场景** | 快速原型、Node.js 生态 | 高性能、嵌入式 |
-| **包大小** | 较大（Node.js 运行时） | 小（静态链接） |
+> TypeScript vs Rust 详细对比参见 [附录 A.3](#a3-typescript-vs-rust-对比)。
 
 ---
 
