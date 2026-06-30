@@ -794,6 +794,18 @@ GSI 握手流程：
 20      dlen            4B      附加数据长度（通常为0）
 ```
 
+**expect 字段取值：**
+- `kXR_ExpLogin` = 0x01 — 告知服务器下一步将发送 login（主流）
+- `kXR_ExpBind` = 0x02 — 告知服务器下一步将发送 bind（并行流）
+
+**flags 字段取值（TLS 协商）：**
+- `kXR_secreqs` = 0x01 — 请求服务器返回安全需求
+- `kXR_ableTLS` = 0x02 — 声明客户端支持 TLS
+- `kXR_wantTLS` = 0x04 — 请求切换到 TLS 加密连接
+- `kXR_bifreqs` = 0x08 — 请求服务器返回 bind 接口偏好
+
+若服务器要求 TLS，客户端需重新发送 kXR_protocol 请求（带 `kXR_wantTLS` 标志），然后通过 `node:tls` 升级连接。
+
 #### kXR_login (3007) — 登录
 
 ```
@@ -817,6 +829,14 @@ GSI 握手流程：
 - `kXR_hasipv64` = 8 — 支持 IPv6
 - `kXR_lclfile` = 64 — 本地文件
 - `kXR_redirflags` = 128 — 重定向标志
+
+**dlen 之后的 CGI 附加信息（可选）：**
+客户端可在 dlen 之后附加一个查询字符串，格式为 `&key=value`，包含：
+- ` country=` — 国家代码
+- ` tz=` — 时区
+- ` appname=` — 应用名称
+- ` hostname=` — 客户端主机名
+- ` version=` — 客户端版本号
 
 #### kXR_open (3010) — 打开文件
 
@@ -1064,6 +1084,24 @@ struct ServerResponseBody_Attn {
 | bind | `substreamid(1B)` | 子流 ID |
 | pgread | `offset(8B) + data[dlen]` | 页偏移 + 数据 |
 
+#### kXR_status 响应（CRC32C 校验）
+
+`kXR_status` (4007) 用于 pgread/pgwrite 的数据完整性校验，有额外的 `ServerResponseBody_Status` 结构：
+
+```c
+struct ServerResponseBody_Status {
+   kXR_char  streamid[2];   // 流 ID（必须匹配请求）
+   kXR_unt16 requestid;     // 请求 ID（必须匹配原始请求）
+   kXR_int32 pgrwssz;       // 页读写单元大小 (kXR_pgUnitSZ = 4100)
+   kXR_char reserved[4];    // 保留
+};
+```
+
+客户端收到 `kXR_status` 后需要：
+1. 验证 `streamid` 和 `requestid` 匹配原始请求
+2. 对返回的每页数据计算 CRC32C，与页尾的 4 字节校验值比对
+3. 如校验失败，收集失败页的偏移列表，通过重试请求告知服务器
+
 ### 10.5 握手时序（完整）
 
 ```
@@ -1112,6 +1150,19 @@ struct ServerResponseBody_Attn {
 3. 重新执行握手 → 协议协商 → 登录
 4. 重新发送原始请求
 5. 限制最大重定向次数（通常 16 次）
+
+### 10.7 重连与会话重建
+
+当连接断开后重建时，客户端需要清理旧会话：
+1. 发送 `kXR_endsess` 请求结束旧会话（让服务器关闭旧会话的可写句柄）
+2. 重新执行握手 → 协议协商 → 登录
+3. 如果旧会话的 `kXR_endsess` 返回 `kXR_NotFound`，视为正常（旧会话可能已过期）
+
+重连流程：
+```
+断开 → TCP Connect → 发送 kXR_endsess(旧 sessid) → 等待响应
+  → 初始握手 + kXR_protocol → kXR_login → [可选认证] → Connected
+```
 
 ### 10.7 异步操作模式
 
