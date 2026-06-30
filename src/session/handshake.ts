@@ -13,8 +13,9 @@ import {
   parseProtocolResponse,
   parseLoginResponse,
   parseRedirectResponse,
-  parseErrorBody,
+  parseErrorResponse,
 } from '../protocol/message.js'
+import type { Frame } from '../transport/framer.js'
 
 export interface Session {
   sessid: Uint8Array
@@ -42,23 +43,19 @@ export async function handshake(
 ): Promise<Session> {
   const username = options?.username ?? ''
   const pid = options?.pid ?? process.pid
-
   const flags = kXR_secreqs | kXR_bifreqs
 
   const handshakeBuf = buildHandshakeAndProtocol(0, flags, kXR_ExpLogin)
 
-  const transport = (mux as unknown as { transport: { send: (data: Buffer) => Promise<void> } }).transport
+  const transport = (mux as unknown as { transport: ITransport }).transport
   await transport.send(handshakeBuf)
 
-  const handshakeResp = await readExact(mux, 8 + 12)
-
-  const protoFlags = handshakeResp.readUInt16BE(2)
-  void protoFlags
+  const _serverInit = await readExact(transport, 8 + 12)
 
   const protoFrame = await waitForFrame(mux)
 
   if (protoFrame.status === ResponseStatus.Error) {
-    const err = parseErrorBody(protoFrame.body)
+    const err = parseErrorResponse(protoFrame.body)
     throw new Error(`Protocol handshake error: ${err.errmsg} (${err.errnum})`)
   }
 
@@ -68,13 +65,13 @@ export async function handshake(
 
   const protoResp = parseProtocolResponse(protoFrame.body)
 
-  const loginBuf = buildLoginRequest(0, pid, username, 0, '')
+  const loginBuf = buildLoginRequest(0, pid, username)
   await transport.send(loginBuf)
 
   const loginFrame = await waitForFrame(mux)
 
   if (loginFrame.status === ResponseStatus.Error) {
-    const err = parseErrorBody(loginFrame.body)
+    const err = parseErrorResponse(loginFrame.body)
     throw new Error(`Login error: ${err.errmsg} (${err.errnum})`)
   }
 
@@ -97,41 +94,36 @@ export async function handshake(
   }
 }
 
-async function readExact(mux: Multiplexer, nbytes: number): Promise<Buffer> {
-  const chunks: Buffer[] = []
-  let received = 0
+interface ITransport {
+  send(data: Buffer): Promise<void>
+  onData(callback: (chunk: Buffer) => void): void
+}
 
-  return new Promise<Buffer>((resolve, reject) => {
-    const onData = (chunk: Buffer) => {
+function readExact(transport: ITransport, nbytes: number): Promise<Buffer> {
+  return new Promise<Buffer>((resolve) => {
+    const chunks: Buffer[] = []
+    let received = 0
+
+    const handler = (chunk: Buffer) => {
       chunks.push(chunk)
       received += chunk.length
       if (received >= nbytes) {
-        const buf = Buffer.concat(chunks)
-        resolve(buf.subarray(0, nbytes))
+        transport.onData(() => {})
+        resolve(Buffer.concat(chunks).subarray(0, nbytes))
       }
     }
 
-    const transport = (mux as unknown as {
-      transport: { onData: (cb: (chunk: Buffer) => void) => void }
-    }).transport
-
-    const origOnData = transport.onData.bind(transport)
-    transport.onData((chunk: Buffer) => {
-      onData(chunk)
-    })
-
-    void origOnData
+    transport.onData(handler)
   })
 }
 
-async function waitForFrame(mux: Multiplexer): Promise<import('../transport/framer.js').Frame> {
-  const { Framer } = await import('../transport/framer.js')
+import { Framer } from '../transport/framer.js'
+
+function waitForFrame(mux: Multiplexer): Promise<Frame> {
   const framer = new Framer()
 
-  return new Promise<resolve>((resolve) => {
-    const transport = (mux as unknown as {
-      transport: { onData: (cb: (chunk: Buffer) => void) => void }
-    }).transport
+  return new Promise<Frame>((resolve) => {
+    const transport = (mux as unknown as { transport: ITransport }).transport
 
     transport.onData((chunk: Buffer) => {
       const frames = framer.feed(chunk)

@@ -73,7 +73,7 @@ export class XRootDUrl {
     path: string
   } {
     const match = url.match(
-      /^(roots?):\/\/(?:(?:([^:]+)(?::([^@]*))?)@)?([^:/]+)(?::(\d+))?)?(\/.*)?$/,
+      /^(roots?):\/\/(?:(?:([^:]+)(?::([^@]*))?)@)?([^:/]+)(?::(\d+))?(\/.*)?)$/,
     )
     if (!match) {
       throw new Error(`Invalid XRootD URL: ${url}`)

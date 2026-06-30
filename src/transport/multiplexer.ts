@@ -25,14 +25,14 @@ export class Multiplexer {
   private pending = new Map<number, PendingRequest>()
   private nextStreamId = 0
   private timeout = 30000
-  private sweepTimer: ReturnType<typeof setInterval> | null = null
+  private sweepTimer: ReturnType<typeof globalThis.setInterval> | null = null
   private closed = false
 
   constructor(transport: ITransport) {
     this.transport = transport
     this.framer = new Framer()
 
-    this.sweepTimer = setInterval(() => this.sweepTimeouts(), 1000)
+    this.sweepTimer = globalThis.setInterval(() => this.sweepTimeouts(), 1000)
     this.sweepTimer.unref()
 
     this.transport.onData((chunk) => {
@@ -95,7 +95,7 @@ export class Multiplexer {
       const pending = this.pending.get(sid)
       if (pending) {
         pending.expiresAt = Date.now() + seconds * 1000
-        setTimeout(() => this.retryRequest(sid), seconds * 1000)
+        globalThis.setTimeout(() => this.retryRequest(sid), seconds * 1000)
       }
       return
     }
@@ -104,7 +104,7 @@ export class Multiplexer {
       const seconds = frame.body.readInt32BE(0)
       const pending = this.pending.get(sid)
       if (pending) {
-        setTimeout(() => this.retryRequest(sid), seconds * 1000)
+        globalThis.setTimeout(() => this.retryRequest(sid), seconds * 1000)
       }
       return
     }
@@ -143,11 +143,11 @@ export class Multiplexer {
     this.closed = true
 
     if (this.sweepTimer) {
-      clearInterval(this.sweepTimer)
+      globalThis.clearInterval(this.sweepTimer)
       this.sweepTimer = null
     }
 
-    for (const [sid, req] of this.pending.entries()) {
+    for (const [, req] of this.pending.entries()) {
       req.reject(new Error('Multiplexer closed'))
     }
     this.pending.clear()

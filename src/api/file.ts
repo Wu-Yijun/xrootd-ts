@@ -1,5 +1,5 @@
 import { Multiplexer } from '../transport/multiplexer.js'
-import type { Session } from './handshake.js'
+import type { Session } from '../session/handshake.js'
 import {
   buildOpenRequest,
   buildReadRequest,
@@ -7,6 +7,7 @@ import {
   buildCloseRequest,
   buildStatRequest,
   parseOpenResponse,
+  parseErrorResponse,
 } from '../protocol/message.js'
 import { ResponseStatus } from '../protocol/constants.js'
 import { XRootDError } from './errors.js'
@@ -53,8 +54,7 @@ export class File {
     )
 
     if (frame.status === ResponseStatus.Error) {
-      const errnum = frame.body.readInt32BE(0)
-      const errmsg = frame.body.toString('utf-8', 4).replace(/\0+$/, '')
+      const { errnum, errmsg } = parseErrorResponse(frame.body)
       throw new XRootDError(errnum, errmsg)
     }
 
@@ -73,27 +73,11 @@ export class File {
       throw new XRootDError(3004, 'File is not open')
     }
 
-    const body = new Uint8Array(16)
-    body.set(this.fhandle, 0) // fhandle[4] at offset 0 of body
-    // offset as int64 BE at offset 4 of body
-    body[8] = 0
-    body[9] = 0
-    body[10] = 0
-    body[11] = 0
-    body[12] = (offset >>> 24) & 0xff
-    body[13] = (offset >>> 16) & 0xff
-    body[14] = (offset >>> 8) & 0xff
-    body[15] = offset & 0xff
-    // rlen at offset 16 of request body... actually rlen is at offset 16-19 of the 24-byte header
-
-    const frame = await this.mux.request(
-      3013, // RequestId.Read
-      body,
-    )
+    const buf = buildReadRequest(0, this.fhandle, offset, size)
+    const frame = await sendRequest(this.mux, buf)
 
     if (frame.status === ResponseStatus.Error) {
-      const errnum = frame.body.readInt32BE(0)
-      const errmsg = frame.body.toString('utf-8', 4).replace(/\0+$/, '')
+      const { errnum, errmsg } = parseErrorResponse(frame.body)
       throw new XRootDError(errnum, errmsg)
     }
 
@@ -109,27 +93,11 @@ export class File {
       throw new XRootDError(3004, 'File is not open')
     }
 
-    const body = new Uint8Array(16)
-    body.set(this.fhandle, 0) // fhandle[4]
-    // offset as int64 BE
-    body[8] = 0
-    body[9] = 0
-    body[10] = 0
-    body[11] = 0
-    body[12] = (offset >>> 24) & 0xff
-    body[13] = (offset >>> 16) & 0xff
-    body[14] = (offset >>> 8) & 0xff
-    body[15] = offset & 0xff
-
-    const frame = await this.mux.request(
-      3019, // RequestId.Write
-      body,
-      data,
-    )
+    const buf = buildWriteRequest(0, this.fhandle, offset, data)
+    const frame = await sendRequest(this.mux, buf, data)
 
     if (frame.status === ResponseStatus.Error) {
-      const errnum = frame.body.readInt32BE(0)
-      const errmsg = frame.body.toString('utf-8', 4).replace(/\0+$/, '')
+      const { errnum, errmsg } = parseErrorResponse(frame.body)
       throw new XRootDError(errnum, errmsg)
     }
 
@@ -145,20 +113,14 @@ export class File {
       return
     }
 
-    const body = new Uint8Array(16)
-    body.set(this.fhandle, 0) // fhandle[4]
-
-    const frame = await this.mux.request(
-      3003, // RequestId.Close
-      body,
-    )
+    const buf = buildCloseRequest(0, this.fhandle)
+    const frame = await sendRequest(this.mux, buf)
 
     this.fhandle = null
     this._isOpen = false
 
     if (frame.status === ResponseStatus.Error) {
-      const errnum = frame.body.readInt32BE(0)
-      const errmsg = frame.body.toString('utf-8', 4).replace(/\0+$/, '')
+      const { errnum, errmsg } = parseErrorResponse(frame.body)
       throw new XRootDError(errnum, errmsg)
     }
   }
@@ -168,17 +130,11 @@ export class File {
       throw new XRootDError(3004, 'File is not open')
     }
 
-    const body = new Uint8Array(16)
-    body.set(this.fhandle, 12) // fhandle[4] at offset 12-15
-
-    const frame = await this.mux.request(
-      3017, // RequestId.Stat
-      body,
-    )
+    const buf = buildStatRequest(0, '', this.fhandle)
+    const frame = await sendRequest(this.mux, buf)
 
     if (frame.status === ResponseStatus.Error) {
-      const errnum = frame.body.readInt32BE(0)
-      const errmsg = frame.body.toString('utf-8', 4).replace(/\0+$/, '')
+      const { errnum, errmsg } = parseErrorResponse(frame.body)
       throw new XRootDError(errnum, errmsg)
     }
 
@@ -188,6 +144,16 @@ export class File {
 
     throw new XRootDError(3012, `Unexpected stat response status: ${frame.status}`)
   }
+}
+
+async function sendRequest(
+  mux: Multiplexer,
+  buf: Buffer,
+  data?: Uint8Array,
+) {
+  const requestId = buf.readUInt16BE(2)
+  const body = new Uint8Array(buf.subarray(4, 20))
+  return mux.request(requestId, body, data)
 }
 
 function parseStatInfo(body: Buffer): StatInfo {
