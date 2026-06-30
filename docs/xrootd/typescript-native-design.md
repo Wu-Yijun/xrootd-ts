@@ -541,7 +541,208 @@ for await (const chunk of stream) {
 
 ---
 
-## 四、模块划分
+## 四、C++ 文件 → TypeScript 模块映射
+
+### 4.1 协议层（P0，必须逐字段翻译）
+
+| C++ 文件 | TS 模块 | 说明 |
+|----------|---------|------|
+| `XProtocol/XPtypes.hh` | `src/protocol/types.ts` | 基础类型（kXR_int32 等） |
+| `XProtocol/XProtocol.hh` | `src/protocol/constants.ts` | 请求码、响应码、错误码、请求/响应结构体 |
+| `XProtocol/XProtocol.cc` | `src/protocol/utils.ts` | errno 映射、错误名查找 |
+
+### 4.2 传输层（P0，保持协议逻辑，重写 API）
+
+| C++ 文件 | TS 模块 | 说明 |
+|----------|---------|------|
+| `XrdCl/XrdClXRootDTransport.hh/cc` | `src/transport/transport.ts` + `handshake.ts` | 握手状态机、消息编解码 |
+| `XrdCl/XrdClMessage.hh/cc` | `src/protocol/message.ts` | 消息封装 |
+| `XrdCl/XrdClBuffer.hh` | 使用 Node.js `Buffer` | 无需实现 |
+| `XrdCl/XrdClSocket.hh/cc` | 使用 `node:net` | 无需实现 |
+| `XrdCl/XrdClTls.hh/cc` | 使用 `node:tls` | 无需实现 |
+
+### 4.3 连接管理（P1，大幅简化）
+
+| C++ 文件 | TS 模块 | 说明 |
+|----------|---------|------|
+| `XrdCl/XrdClPostMaster.hh/cc` | `src/connection/client.ts` | 简化为 Map<URL, Transport> |
+| `XrdCl/XrdClChannel.hh/cc` | 合并到 `transport.ts` | 单子流简化 |
+| `XrdCl/XrdClStream.hh/cc` | 合并到 `transport.ts` | 单子流简化 |
+| `XrdCl/XrdClAsyncSocketHandler.hh/cc` | 使用 Node.js 事件循环 | 无需实现 |
+| `XrdCl/XrdClPoller*.hh/cc` | 使用 Node.js Event Loop | 无需实现 |
+| `XrdCl/XrdClTaskManager.hh/cc` | 使用 `setTimeout`/`setInterval` | 无需实现 |
+| `XrdCl/XrdClJobManager.hh/cc` | 使用 Node.js Worker Threads | 无需实现 |
+| `XrdCl/XrdClInQueue.hh/cc` | 使用 Promise map | 简化实现 |
+| `XrdCl/XrdClOutQueue.hh/cc` | 使用数组队列 | 简化实现 |
+| `XrdCl/XrdClSIDManager.hh/cc` | 内部 streamId 计数器 | 简化为属性 |
+
+### 4.4 用户 API（P1，完全重新设计）
+
+| C++ 文件 | TS 模块 | 说明 |
+|----------|---------|------|
+| `XrdCl/XrdClFile.hh/cc` | `src/api/file.ts` | 重新设计为 async/await |
+| `XrdCl/XrdClFileSystem.hh/cc` | `src/api/filesystem.ts` | 重新设计为 async/await |
+| `XrdCl/XrdClXRootDResponses.hh/cc` | `src/api/types.ts` | StatInfo, LocationInfo 等 |
+| `XrdCl/XrdClStatus.hh/cc` | `src/api/errors.ts` | XRootDError 类 |
+| `XrdCl/XrdClURL.hh/cc` | `src/api/url.ts` | URL 解析 |
+| `XrdCl/XrdClEnv.hh/cc` | `src/connection/options.ts` | 全局配置 |
+| `XrdCl/XrdClDefaultEnv.hh/cc` | `src/connection/client.ts` | 默认 Client 实例 |
+| `XrdCl/XrdClBuffer.hh` | 使用 `Uint8Array` | 无需实现 |
+| `XrdCl/XrdClPropertyList.hh` | `Record<string, unknown>` | 无需实现 |
+| `XrdCl/XrdClOptional.hh` | TypeScript `?` 语法 | 无需实现 |
+| `XrdCl/XrdClPlugInInterface.hh` | ES Module interface | 无需实现 |
+
+### 4.5 可以跳过的文件（P2-P3）
+
+| C++ 文件 | 原因 |
+|----------|------|
+| `XrdCl/XrdClCopyProcess.hh/cc` | 复制过程管理，v1.5+ 再实现 |
+| `XrdCl/XrdClClassicCopyJob.*` | 经典复制任务 |
+| `XrdCl/XrdClThirdPartyCopyJob.*` | 第三方复制 |
+| `XrdCl/XrdClEcHandler.*` | 纠删码处理器 |
+| `XrdCl/XrdClZipArchive.*` | ZIP 支持 |
+| `XrdCl/XrdClZipListHandler.*` | ZIP 列表 |
+| `XrdCl/XrdClOperations.*` | 声明式操作框架 |
+| `XrdCl/XrdClFileOperations.*` | 文件操作声明式封装 |
+| `XrdCl/XrdClFileSystemOperations.*` | 文件系统操作声明式封装 |
+| `XrdCl/XrdClParallelOperation.*` | 并行操作 |
+| `XrdCl/XrdClMetalinkRedirector.*` | Metalink 重定向 |
+| `XrdCl/XrdClRedirectorRegistry.*` | 重定向注册表 |
+| `XrdCl/XrdClMonitor.*` | 监控接口 |
+| `XrdCl/XrdClLocalFileHandler.*` | 本地文件处理 |
+| `XrdCl/XrdClForkHandler.*` | fork 处理 |
+| `XrdCl/XrdClFileTimer.*` | 定时器 |
+| `XrdCl/XrdClCheckSumManager.*` | 校验和管理（内置简单实现） |
+| `XrdCl/XrdClMessageUtils.*` | 消息工具 |
+| `XrdCl/XrdClUtils.*` | 通用工具 |
+| `XrdCl/XrdClPlugInManager.*` | 插件管理 |
+| `XrdCl/XrdClAsyncHSReader/Writer.*` | 异步握手读写 |
+| `XrdCl/XrdClAsyncMsgReader/Writer.*` | 异步消息读写 |
+| `XrdCl/XrdClAsyncRawReader.*` | 异步原始读取 |
+| `XrdCl/XrdClAsyncPageReader.*` | 异步页读取 |
+| `XrdCl/XrdClAsyncVectorReader.*` | 异步向量读取 |
+| `XrdCl/XrdClCopy.cc` | xrdcp 命令行工具 |
+| `XrdCl/XrdClFS.cc` | xrdfs 命令行工具 |
+
+---
+
+## 五、第三方库替代清单
+
+| C++ 模块 | TypeScript 替代 | 用途 |
+|----------|----------------|------|
+| `XrdSys` | Node.js 内置 | 线程、同步、日志 |
+| `XrdNet` | `node:net` / `node:dns` | TCP 连接、DNS 解析 |
+| `XrdTls` | `node:tls` | TLS/SSL 加密 |
+| `XrdOuc` | 自实现（少量工具函数） | URL 解析、字符串处理 |
+| `XrdXml` | `fast-xml-parser` | Metalink XML 解析 |
+| `ZLIB` | `node:zlib` | 数据压缩 |
+| `OpenSSL` | `node:crypto` | 加密、哈希 |
+| `uuid` | `uuid` 包 | UUID 生成 |
+| `XrdCrypto` | `node:crypto` | 证书处理（认证时用） |
+| `XrdSec` | 自实现认证接口 | 认证框架 |
+
+---
+
+## 六、协议流程图
+
+### 6.1 握手流程
+
+```
+Client                              Server
+  │                                   │
+  │  1. TCP Connect                   │
+  │──────────────────────────────────>│
+  │                                   │
+  │  2. ClientHandShake (20 bytes)    │
+  │     first=0, second=0             │
+  │     third=0x00000520              │
+  │     fourth=0, fifth=0             │
+  │──────────────────────────────────>│
+  │                                   │
+  │  3. ServerHandShake (12 bytes)    │
+  │     msglen, protover, msgval      │
+  │<──────────────────────────────────│
+  │                                   │
+  │  4. Protocol Request              │
+  │     (kXR_protocol, 3006)          │
+  │──────────────────────────────────>│
+  │                                   │
+  │  5. Protocol Response             │
+  │<──────────────────────────────────│
+  │                                   │
+  │  6. Login Request                 │
+  │     (kXR_login, 3007)             │
+  │     + pname[8] (服务器名)         │
+  │──────────────────────────────────>│
+  │                                   │
+  │  7. Login Response                │
+  │     + sessionid[16]               │
+  │     + secToken (可选)             │
+  │<──────────────────────────────────│
+  │                                   │
+  │  8. Auth Request (可选)           │
+  │     (kXR_auth, 3000)              │
+  │     + secProtocol + secToken      │
+  │──────────────────────────────────>│
+  │                                   │
+  │  9. Auth Response                 │
+  │<──────────────────────────────────│
+  │                                   │
+  │  === 连接就绪 ===                 │
+```
+
+### 6.2 文件读取流程
+
+```
+Client                              Server
+  │                                   │
+  │  Open Request (kXR_open)          │
+  │  + path, flags, mode              │
+  │──────────────────────────────────>│
+  │  Open Response                    │
+  │  + fhandle[4]                     │
+  │<──────────────────────────────────│
+  │                                   │
+  │  Read Request (kXR_read)          │
+  │  + fhandle, offset[8], dlen       │
+  │──────────────────────────────────>│
+  │  Read Response                    │
+  │  + data[dlen]                     │
+  │<──────────────────────────────────│
+  │                                   │
+  │  Close Request (kXR_close)        │
+  │  + fhandle                        │
+  │──────────────────────────────────>│
+  │  Close Response                   │
+  │<──────────────────────────────────│
+```
+
+### 6.3 重定向处理
+
+```
+Client                              Server A
+  │                                   │
+  │  Read Request                     │
+  │──────────────────────────────────>│
+  │                                   │
+  │  Redirect Response                │
+  │  + newhost, newport               │
+  │<──────────────────────────────────│
+  │                                   │
+  │  (自动重连到 Server B)            │
+  │  TCP Connect                      │
+  │──────────────────────────────────>│  Server B
+  │  HandShake + Login                │
+  │──────────────────────────────────>│
+  │  重新发送 Read Request            │
+  │──────────────────────────────────>│
+  │  Read Response                    │
+  │<──────────────────────────────────│
+```
+
+---
+
+## 七、模块划分
 
 ```
 xrootd-client/
@@ -573,9 +774,120 @@ xrootd-client/
 
 ---
 
-## 五、关键设计决策
+## 八、关键设计决策
 
-### 5.1 错误处理：异常 vs Result
+### 8.1 重定向处理
+
+```typescript
+// Transport 内部自动处理重定向
+async sendRequest(requestId: RequestId, body: Uint8Array): Promise<Buffer> {
+  const response = await this.sendRaw(requestId, body)
+  const status = response.readInt16BE(0)
+
+  if (status === ResponseStatus.Redirect) {
+    // 解析重定向地址
+    const newHost = response.subarray(20).toString().split('|')[0]
+    // 重新连接
+    await this.close()
+    this.url = new URL(`root://${newHost}${this.url.pathname}`)
+    await this.connect()
+    // 重试请求
+    return this.sendRaw(requestId, body)
+  }
+
+  if (status === ResponseStatus.Error) {
+    const errCode = response.readInt16BE(20)
+    throw new XRootDError(errCode, response.subarray(24).toString())
+  }
+
+  return response
+}
+```
+
+### 8.2 错误类定义
+
+```typescript
+// src/api/errors.ts
+export class XRootDError extends Error {
+  constructor(
+    public readonly code: number,      // kXR 错误码 (3000-3035)
+    message?: string,
+    public readonly errno?: number,    // POSIX errno
+  ) {
+    super(message ?? XRootDError.codeToMessage(code))
+    this.name = 'XRootDError'
+  }
+
+  static codeToMessage(code: number): string {
+    const messages: Record<number, string> = {
+      300: 'Invalid arguments',
+      301: 'File not found',
+      302: 'Permission denied',
+      303: 'No space left',
+      304: 'Operation not supported',
+      305: 'File already exists',
+      306: 'Invalid checksum',
+      307: 'File too large',
+      308: 'Invalid link path',
+      309: 'Not a directory',
+      310: 'Directory not empty',
+      311: 'Timed out',
+      312: 'Too many links',
+      313: 'Missing credential',
+      314: 'Credential expired',
+      315: 'No master server',
+      // ...
+    }
+    return messages[code] ?? `XRootD error ${code}`
+  }
+}
+```
+
+### 8.3 并发请求与流复用
+
+```typescript
+// XRootD 协议支持在单个 TCP 连接上复用多个请求
+// 通过 streamid 匹配请求和响应
+
+export class Transport {
+  private pending = new Map<number, {
+    resolve: (data: Buffer) => void
+    reject: (err: Error) => void
+  }>()
+  private streamId = 0
+
+  async sendRequest(requestId: RequestId, body: Uint8Array): Promise<Buffer> {
+    const sid = this.streamId++
+    this.streamId &= 0xffff  // 16-bit wrap
+
+    return new Promise((resolve, reject) => {
+      this.pending.set(sid, { resolve, reject })
+
+      // 发送请求...
+      this.writeToSocket(requestId, sid, body)
+    })
+  }
+
+  // 接收响应时，根据 streamid 匹配
+  private onResponse(data: Buffer) {
+    const sid = (data[0] << 8) | data[1]
+    const status = data.readUInt16BE(2)
+    const pending = this.pending.get(sid)
+    if (pending) {
+      this.pending.delete(sid)
+      pending.resolve(data)
+    }
+  }
+}
+
+// 使用：多个请求可以并发发送
+const [data1, data2] = await Promise.all([
+  file1.read(0, 1024),
+  file2.read(0, 2048),
+])
+```
+
+### 8.4 错误处理：异常 vs Result
 
 ```typescript
 // 方案 A：异常（推荐，符合 TypeScript 惯例）
@@ -596,7 +908,7 @@ if (result.ok) { ... } else { ... }
 
 **建议：** 默认使用异常，提供 `safeXxx` 方法返回 Result。
 
-### 5.2 连接池
+### 8.5 连接池
 
 ```typescript
 // 自动连接池（内置）
@@ -610,7 +922,7 @@ const client = new Client({
 const transport = await client.getConnection('root://server')
 ```
 
-### 5.3 超时控制
+### 8.6 超时控制
 
 ```typescript
 // 方案 1：全局默认
@@ -627,7 +939,7 @@ await file.open(url, { signal: controller.signal })
 
 ---
 
-## 六、总结
+## 九、总结
 
 TypeScript 原生设计可以**大幅简化** C++ 原版的复杂度：
 

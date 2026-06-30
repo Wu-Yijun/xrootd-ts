@@ -547,3 +547,22 @@ src/api/responses.ts           # XrdClXRootDResponses
 7. **异步模型**：XrdCl 使用回调式异步，TypeScript/Rust 可以用 Promise/async-await 简化。
 
 8. **向后兼容**：协议修改必须保持向后兼容性（只能在末尾添加新码）。
+
+---
+
+## 十、与 TypeScript 原生设计的关系
+
+本文档侧重于**"迁移什么"**（C++ 文件映射、优先级、替代库），API 设计细节请参考 `typescript-native-design.md`。
+
+两篇文档的互补关系：
+
+| 维度 | 本文档（migration-analysis） | TypeScript 原生设计 |
+|------|---------------------------|-------------------|
+| C++ 文件映射 | ✅ 138 个文件分类 | ❌ |
+| 第三方库替代 | ✅ 详细表格 | ❌ |
+| 认证插件优先级 | ✅ P0-P3 | 仅 host/sss |
+| 协议流程图 | ✅ 握手+读取 | ✅ 含重定向 |
+| API 风格设计 | ❌ 仍是 C++ 风格 | ✅ 原生 TypeScript |
+| 代码示例 | ❌ | ✅ 完整实现 |
+| Stream 复用 | ❌ | ✅ Promise map |
+| 错误类定义 | ❌ | ✅ XRootDError |
