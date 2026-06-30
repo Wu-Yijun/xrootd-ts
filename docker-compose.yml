@@ -1,0 +1,39 @@
+version: '3.8'
+
+services:
+  xrootd-mock:
+    image: alisw/xrootd:latest
+    container_name: xrootd-mock-server
+    ports:
+      - "1094:1094"
+    volumes:
+      - ./mock-server/config:/etc/xrootd:ro
+      - ./mock-server/data:/data
+      - ./mock-server/logs:/var/log/xrootd
+    environment:
+      - XROOTD_USER=nobody
+    healthcheck:
+      test: ["CMD", "nc", "-z", "localhost", "1094"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    restart: unless-stopped
+
+  xrootd-mock-tls:
+    image: alisw/xrootd:latest
+    container_name: xrootd-mock-server-tls
+    ports:
+      - "1095:1094"
+    volumes:
+      - ./mock-server/config-tls:/etc/xrootd:ro
+      - ./mock-server/data:/data
+      - ./mock-server/logs:/var/log/xrootd
+      - ./mock-server/certs:/etc/xrootd/certs:ro
+    environment:
+      - XROOTD_USER=nobody
+    healthcheck:
+      test: ["CMD", "nc", "-z", "localhost", "1094"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    restart: unless-stopped

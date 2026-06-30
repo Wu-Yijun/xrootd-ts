@@ -1,5 +1,5 @@
 {
-  "name": "@xrootd/client",
+  "name": "xrootd",
   "version": "0.1.0",
   "description": "A TypeScript client library for the XRootD protocol",
   "main": "dist/index.js",
@@ -15,7 +15,11 @@
     "dev": "tsdown --watch",
     "typecheck": "tsc --noEmit",
     "lint": "tsc --noEmit",
-    "test": "node --experimental-strip-types --test src/**/*.test.ts"
+    "test": "node --experimental-strip-types --test src/**/*.test.ts",
+    "mock-server:up": "docker compose up -d",
+    "mock-server:down": "docker compose down",
+    "mock-server:logs": "docker compose logs -f xrootd-mock",
+    "mock-server:verify": "node --experimental-strip-types scripts/verify-mock-server.ts"
   },
   "keywords": [
     "xrootd",

@@ -177,7 +177,7 @@
 | CI 流程 | GitHub Actions：Node.js 22+ 构建、类型检查、测试 |
 | API 文稿 | 基于 TSDoc 生成 API 文档 |
 | README 完善 | 使用示例、API 概览、迁移指南 |
-| npm 发布 | 配置 publishConfig，发布 @xrootd/client |
+| npm 发布 | 配置 publishConfig，发布 xrootd |
 
 ---
 
