@@ -187,17 +187,21 @@ HandShakeParallel (并行流, subStreamId>0):
 
 **优先级：P0**
 
-消息封装类，管理请求/响应的序列化。
+消息帧构建/解析，配合三层架构中的 Framer 使用。TypeScript 版使用 `Buffer` 内置方法进行大端序读写。
 
 ```typescript
 class Message {
-  buffer: Uint8Array;
-  isMarshalled: boolean;
-  sessionId: number;
+  private buffer: Buffer
+  private offset = 0
 
-  Marshall(body: Uint8Array): void;
-  GetBody(): Uint8Array;
-  GetSize(): number;
+  constructor(size: number)
+  writeInt32BE(value: number): void
+  writeInt16BE(value: number): void
+  writeBytes(data: Uint8Array): void
+  readInt32BE(): number
+  readInt16BE(): number
+  readBytes(length: number): Buffer
+  getBuffer(): Buffer
 }
 ```
 
