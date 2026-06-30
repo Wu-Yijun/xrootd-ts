@@ -1193,67 +1193,51 @@ struct ServerResponseBody_Status {
 
 ## 十一、架构设计建议
 
-### 11.1 TypeScript 推荐架构
+### 11.1 TypeScript 推荐架构（三层精简版）
 
 ```
 xrootd-client/
 ├── src/
-│   ├── protocol/           # 协议帧定义、编解码、请求码/错误码枚举
-│   │   ├── types.ts        # XPtypes — 基础类型
-│   │   ├── constants.ts    # 请求码、响应码、错误码常量
-│   │   ├── codec.ts        # 编解码（大端序读写）
-│   │   └── structures.ts   # 请求/响应结构体
+│   ├── index.ts                # 公共 API 导出
 │   │
-│   ├── transport/          # TCP 连接、TLS、消息读写状态机
-│   │   ├── socket.ts       # TCP 连接封装
-│   │   ├── tls.ts          # TLS 支持
-│   │   ├── message.ts      # 消息封装（Message 类）
-│   │   └── transport.ts    # XRootD 传输协议实现
+│   ├── protocol/               # 协议层：帧定义、编解码
+│   │   ├── types.ts            # 基础类型（对应 XPtypes.hh）
+│   │   ├── constants.ts        # 请求码、响应码、错误码枚举
+│   │   ├── codec.ts            # 大端序编解码工具函数
+│   │   └── message.ts          # 消息帧构建/解析（Message 类）
 │   │
-│   ├── session/            # 会话管理、握手流程、认证协商
-│   │   ├── handshake.ts    # 握手状态机
-│   │   ├── auth.ts         # 认证框架
-│   │   └── session.ts      # Session ID 管理
+│   ├── transport/              # 三层传输架构
+│   │   ├── transport.ts        # Layer 1: net.Socket 封装
+│   │   ├── framer.ts           # Layer 2: 帧解析器（粘包/半包处理）
+│   │   └── multiplexer.ts      # Layer 3: 简易多路复用器（streamid → Promise）
 │   │
-│   ├── security/           # 安全协议插件接口
-│   │   ├── interface.ts    # SecurityProtocol 接口
-│   │   ├── host.ts         # host 认证（最简单）
-│   │   ├── sss.ts          # SSS 共享密钥认证
-│   │   └── gsi.ts          # GSI/X.509（可选）
+│   ├── session/                # 会话层：握手、认证
+│   │   ├── handshake.ts        # 握手状态机（含 TLS 协商）
+│   │   └── auth.ts             # 认证框架
 │   │
-│   ├── url/                # URL 解析和路由
-│   │   └── url.ts          # URL 类
+│   ├── security/               # 安全协议插件
+│   │   ├── interface.ts        # SecurityProtocol 接口
+│   │   ├── host.ts             # host 认证（最简单）
+│   │   └── sss.ts              # SSS 共享密钥认证
 │   │
-│   ├── channel/            # 连接通道 (per-host)
-│   │   ├── channel.ts      # Channel 类
-│   │   └── postmaster.ts   # 消息路由中心
+│   ├── url/
+│   │   └── url.ts              # URL 解析
 │   │
-│   ├── stream/             # 流管理、子流复用
-│   │   ├── stream.ts       # Stream 类
-│   │   └── async-handler.ts # 异步 Socket 处理器
+│   ├── api/                    # 公共 API 层
+│   │   ├── file.ts             # File 类
+│   │   ├── filesystem.ts       # FileSystem 类
+│   │   ├── errors.ts           # XRootDError 类
+│   │   └── types.ts            # StatInfo, LocationInfo 等
 │   │
-│   ├── api/                # 公共 API 层
-│   │   ├── file.ts         # File 类（open/read/write/close/stat）
-│   │   ├── filesystem.ts   # FileSystem 类（dirlist/mkdir/rm/stat）
-│   │   ├── copy.ts         # CopyProcess 复制引擎
-│   │   ├── status.ts       # Status 和错误码
-│   │   ├── responses.ts    # 响应类型（StatInfo, LocationInfo 等）
-│   │   └── operations.ts   # 操作链式组合（可选）
-│   │
-│   ├── plugin/             # 插件接口
-│   │   ├── interface.ts    # FilePlugIn, FileSystemPlugIn
-│   │   └── manager.ts      # PlugInManager
-│   │
-│   └── utils/              # 工具层
-│       ├── error.ts        # 错误类型和错误码映射
-│       ├── logging.ts      # 日志
-│       ├── cache.ts        # URL 缓存、DNS 缓存
-│       └── buffer.ts       # Buffer 工具函数
+│   └── utils/
+│       └── buffer.ts           # Buffer 工具函数
 │
 ├── tests/
 ├── package.json
 └── tsconfig.json
 ```
+
+> 详细的 TypeScript API 设计（类接口、代码示例、实现细节）参见 [docs/typescript-design.md](typescript-design.md)。
 
 ### 11.2 Rust 推荐架构
 
