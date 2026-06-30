@@ -395,11 +395,22 @@ export class Message {
 ### 4.3 传输层（Layer 1）
 
 ```typescript
+// src/transport/interface.ts
+export interface ITransport {
+  connect(host: string, port: number, useTls?: boolean): Promise<void>
+  send(data: Buffer): Promise<void>
+  onData(callback: (chunk: Buffer) => void): void
+  close(): Promise<void>
+}
+```
+
+```typescript
 // src/transport/transport.ts
 import net from 'node:net'
 import tls from 'node:tls'
+import type { ITransport } from './interface.js'
 
-export class Transport {
+export class Transport implements ITransport {
   private socket: net.Socket | tls.TLSSocket | null = null
 
   async connect(host: string, port: number, useTls = false): Promise<void> {
@@ -485,18 +496,31 @@ export class Framer {
 }
 ```
 
+#### 性能说明
+
+**Buffer.alloc vs Buffer.allocUnsafe**：当前 `pending` 初始化使用 `Buffer.alloc(0)`（零填充）。生产实现中可改用 `Buffer.allocUnsafe` 避免零填充开销——Framer 内部立即覆写数据，不存在安全风险。
+
+**Buffer.concat 的 GC 压力**：`feed()` 中的 `Buffer.concat([this.pending, chunk])` 每次调用都分配新 Buffer，在高吞吐场景下会产生显著 GC 压力。v1 可接受，Rust 版应使用 `bytes::BytesMut` 实现零拷贝。
+
+**subarray 视图**：`this.pending.subarray(8 + dlen)` 返回的是同一底层内存的视图（非拷贝），Frame.body 在下一次 `feed()` 调用前必须被消费。
+
 ### 4.5 简易多路复用器（Layer 3）
 
 ```typescript
 // src/transport/multiplexer.ts
-import { Transport } from './transport.js'
+import type { ITransport } from './interface.js'
 import { Framer, Frame } from './framer.js'
 import { Message } from '../protocol/message.js'
+import { ResponseStatus } from '../protocol/constants.js'
 
 interface PendingRequest {
   resolve: (frame: Frame) => void
   reject: (err: Error) => void
-  timer?: ReturnType<typeof setTimeout>
+  expiresAt: number
+  // 保存原始请求参数，用于 kXR_wait/kXR_waitresp 重试
+  requestId: number
+  body: Uint8Array
+  data?: Uint8Array
 }
 
 /**
@@ -507,15 +531,18 @@ interface PendingRequest {
  * 收到 Framer 传来的完整帧时，读取头部 ID，从 Map 取出对应 resolve 唤醒业务代码
  */
 export class Multiplexer {
-  private transport: Transport
+  private transport: ITransport
   private framer: Framer
   private pending = new Map<number, PendingRequest>()
-  private streamId = 0
+  private nextStreamId = 0
   private timeout = 30000  // 默认 30s 超时
 
-  constructor(transport: Transport) {
+  constructor(transport: ITransport) {
     this.transport = transport
     this.framer = new Framer()
+
+    // 全局超时扫描器，每秒检查一次过期请求
+    setInterval(() => this.sweepTimeouts(), 1000).unref()
 
     // 监听原始数据，喂给 Framer 解析
     this.transport.onData((chunk) => {
@@ -526,10 +553,22 @@ export class Multiplexer {
     })
   }
 
+  /** 分配唯一的 streamId，检测碰撞防止覆盖 */
+  private allocateStreamId(): number {
+    let sid = this.nextStreamId
+    while (this.pending.has(sid)) {
+      sid = (sid + 1) & 0xffff
+      if (sid === this.nextStreamId) {
+        throw new Error('Max concurrent requests (65535) reached')
+      }
+    }
+    this.nextStreamId = (sid + 1) & 0xffff
+    return sid
+  }
+
   /** 发送请求并等待响应 */
   async request(requestId: number, body: Uint8Array, data?: Uint8Array): Promise<Frame> {
-    const sid = this.streamId
-    this.streamId = (this.streamId + 1) & 0xffff  // 16-bit 递增
+    const sid = this.allocateStreamId()
 
     // 构建请求帧：streamid[2] + requestid[2] + body[16] + dlen[4] + data
     const bodyBuf = Buffer.alloc(16)
@@ -550,24 +589,70 @@ export class Multiplexer {
     }
 
     return new Promise<Frame>((resolve, reject) => {
-      const timer = setTimeout(() => {
-        this.pending.delete(sid)
-        reject(new Error(`Request timeout: streamid=${sid}`))
-      }, this.timeout)
-
-      this.pending.set(sid, { resolve, reject, timer })
+      this.pending.set(sid, {
+        resolve,
+        reject,
+        expiresAt: Date.now() + this.timeout,
+        requestId,
+        body,
+        data,
+      })
       this.transport.send(msg.getBuffer()).catch(reject)
     })
   }
 
   private handleFrame(frame: Frame): void {
     const sid = (frame.streamId[0] << 8) | frame.streamId[1]
+
+    // kXR_wait (4005): 服务器要求等待指定秒数后重试
+    if (frame.status === ResponseStatus.Wait) {
+      const seconds = frame.body.readInt32BE(0)
+      const pending = this.pending.get(sid)
+      if (pending) {
+        // 重置过期时间，等 seconds 秒后由 sweepTimeouts 或手动重试
+        pending.expiresAt = Date.now() + seconds * 1000
+        setTimeout(() => this.retryRequest(sid), seconds * 1000)
+      }
+      return
+    }
+
+    // kXR_waitresp (4006): 等待后重试原始请求
+    if (frame.status === ResponseStatus.Waitresp) {
+      const seconds = frame.body.readInt32BE(0)
+      const pending = this.pending.get(sid)
+      if (pending) {
+        setTimeout(() => this.retryRequest(sid), seconds * 1000)
+      }
+      return
+    }
+
+    // 正常响应
     const pending = this.pending.get(sid)
     if (!pending) return
-
-    clearTimeout(pending.timer)
     this.pending.delete(sid)
     pending.resolve(frame)
+  }
+
+  /** 重新发送请求（用于 kXR_wait / kXR_waitresp 重试） */
+  private retryRequest(sid: number): void {
+    const pending = this.pending.get(sid)
+    if (!pending) return
+    this.pending.delete(sid)
+    // 重新发起请求，分配新的 streamId
+    this.request(pending.requestId, pending.body, pending.data)
+      .then(pending.resolve)
+      .catch(pending.reject)
+  }
+
+  /** 扫描并清理超时的 pending 请求 */
+  private sweepTimeouts(): void {
+    const now = Date.now()
+    for (const [sid, req] of this.pending.entries()) {
+      if (now > req.expiresAt) {
+        this.pending.delete(sid)
+        req.reject(new Error(`Request timeout: streamid=${sid}`))
+      }
+    }
   }
 
   setTimeout(ms: number): void {
@@ -681,6 +766,21 @@ kXR_wantTLS = 0x04  — 请求切换到 TLS
 ```
 
 如果服务器要求 TLS，客户端重新发送 kXR_protocol（带 `kXR_wantTLS` 标志），然后通过 `node:tls` 升级连接。
+
+### 5.5 断线重连与文件句柄失效
+
+当底层连接断开并重新握手后，**旧 Session 的所有文件句柄（fhandle）均失效**。
+客户端不会自动恢复这些句柄——这是应用层的责任。
+
+**行为规范**：
+- 连接断开时，所有 pending 请求的 Promise 被 reject，错误码为 `ClientError.Disconnected`
+- `File` 类在检测到 `Disconnected` 错误时，应将内部 `fhandle` 置为 null
+- 用户需重新 `open()` 获取新 `fhandle`；如需从断点继续，应记录 offset
+
+**不自动重放的原因**：
+- `kXR_open` 可能带有幂等性语义冲突（如 `kXR_new` 标志会创建新文件）
+- 文件可能在断开期间被移动/删除
+- 用户可能不希望自动重试（例如已切换到另一个操作）
 
 ---
 

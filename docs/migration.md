@@ -1250,6 +1250,9 @@ xrootd-client/
 | **字节序** | `Buffer.writeInt32BE` 等内置方法 | `byteorder` crate |
 | **内存管理** | Buffer 自动 GC | 零拷贝 |
 | **文件句柄** | 4 字节句柄 → `Map<Buffer, FileHandle>` | 同左 |
+| **kXR_wait 处理** | Multiplexer 层 setTimeout 重试 | 指数退避调度器 |
+| **连接池** | 单连接（v1） | kXR_bind 并行子流池 |
+| **句柄恢复** | reject + 用户手动重连 | 透明自动恢复 |
 
 ---
 
