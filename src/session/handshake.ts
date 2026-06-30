@@ -1,12 +1,12 @@
-import { Multiplexer } from '../transport/multiplexer.js'
-import { XRootDUrl } from '../url/url.js'
+import { Multiplexer } from '../transport/multiplexer.ts'
+import { XRootDUrl } from '../url/url.ts'
 import {
   PROTOCOL_VERSION,
   kXR_secreqs,
   kXR_bifreqs,
   kXR_ExpLogin,
   ResponseStatus,
-} from '../protocol/constants.js'
+} from '../protocol/constants.ts'
 import {
   buildHandshakeAndProtocol,
   buildLoginRequest,
@@ -14,8 +14,8 @@ import {
   parseLoginResponse,
   parseRedirectResponse,
   parseErrorResponse,
-} from '../protocol/message.js'
-import type { Frame } from '../transport/framer.js'
+} from '../protocol/message.ts'
+import type { Frame } from '../transport/framer.ts'
 
 export interface Session {
   sessid: Uint8Array
@@ -117,7 +117,7 @@ function readExact(transport: ITransport, nbytes: number): Promise<Buffer> {
   })
 }
 
-import { Framer } from '../transport/framer.js'
+import { Framer } from '../transport/framer.ts'
 
 function waitForFrame(mux: Multiplexer): Promise<Frame> {
   const framer = new Framer()

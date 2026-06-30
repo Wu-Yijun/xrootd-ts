@@ -6,8 +6,8 @@ import {
   HANDSHAKE_FOURTH,
   HANDSHAKE_FIFTH,
   REQUEST_HDR_SIZE,
-} from './constants.js';
-import type { RequestId } from './constants.js';
+} from './constants.ts';
+import type { RequestId } from './constants.ts';
 import {
   put16,
   put32,
@@ -16,7 +16,7 @@ import {
   get32,
   getString,
   getBytes,
-} from './codec.js';
+} from './codec.ts';
 
 // ── Response interfaces ────────────────────────────────────────────────────
 

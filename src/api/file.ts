@@ -1,5 +1,5 @@
-import { Multiplexer } from '../transport/multiplexer.js'
-import type { Session } from '../session/handshake.js'
+import { Multiplexer } from '../transport/multiplexer.ts'
+import type { Session } from '../session/handshake.ts'
 import {
   buildOpenRequest,
   buildReadRequest,
@@ -8,9 +8,9 @@ import {
   buildStatRequest,
   parseOpenResponse,
   parseErrorResponse,
-} from '../protocol/message.js'
-import { ResponseStatus } from '../protocol/constants.js'
-import { XRootDError } from './errors.js'
+} from '../protocol/message.ts'
+import { ResponseStatus } from '../protocol/constants.ts'
+import { XRootDError } from './errors.ts'
 
 export interface StatInfo {
   id: number

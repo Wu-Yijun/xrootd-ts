@@ -1,2 +1,2 @@
-export { XRootDClient } from "./client.js";
-export type { XRootDClientOptions, FileHandle, FileStatus } from "./types.js";
+export { XRootDClient } from "./client.ts";
+export type { XRootDClientOptions, FileHandle, FileStatus } from "./types.ts";

@@ -1,4 +1,4 @@
-import type { XRootDClientOptions, FileHandle, FileStatus, RedirectInfo, QueryResult } from "./types.js";
+import type { XRootDClientOptions, FileHandle, FileStatus, RedirectInfo, QueryResult } from "./types.ts";
 
 export class XRootDClient {
   private readonly host: string;

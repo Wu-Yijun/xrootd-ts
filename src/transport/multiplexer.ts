@@ -1,7 +1,7 @@
-import type { ITransport } from './interface.js'
-import { Framer, type Frame } from './framer.js'
-import { Message } from '../protocol/message.js'
-import { ResponseStatus } from '../protocol/constants.js'
+import type { ITransport } from './interface.ts'
+import { Framer, type Frame } from './framer.ts'
+import { Message } from '../protocol/message.ts'
+import { ResponseStatus } from '../protocol/constants.ts'
 
 interface PendingRequest {
   resolve: (frame: Frame) => void
