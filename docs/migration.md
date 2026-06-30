@@ -1296,20 +1296,19 @@ xrootd-rs/
 
 ## 十二、关键设计决策
 
-| 决策点 | 建议 |
-|--------|------|
-| **异步模型** | TS: async/await + EventEmitter; Rust: tokio + Future |
-| **连接池** | 每个 (host:port) 维护一个 Channel，支持多路复用 |
-| **流复用** | 初期可简化为单流，后续支持 streamid 多路复用 |
-| **重定向** | 自动重连 + 重新握手 + 重发，限制最大重试次数（16次） |
-| **错误恢复** | 文件句柄失效时自动重 open + seek 恢复 |
-| **认证** | 初期仅 SSS + host，GSI 作为可选模块 |
-| **插件** | TS: 动态 import; Rust: trait + Box<dyn> |
-| **字节序** | 统一使用大端序工具函数 |
-| **内存管理** | Rust: 零拷贝; TS: Buffer 池化 |
-| **文件句柄管理** | 4 字节句柄 → Map<fhandle, FileHandle> 映射 |
-| **请求匹配** | streamid 分配器，确保唯一性 |
-| **超时处理** | 每个请求独立超时，支持取消 |
+| 决策点 | TypeScript 方案 | Rust 方案（参考） |
+|--------|----------------|-------------------|
+| **API 命名** | `File` / `FileSystem`（简洁，TS 惯例） | 同左 |
+| **错误处理** | throw `XRootDError` 异常 | `Result<T, XRootDError>` |
+| **连接管理** | 三层精简架构：Transport → Framer → Multiplexer | PostMaster → Channel → Stream |
+| **流复用** | streamid 递增 + `Map<number, {resolve, reject}>` | tokio + 多路复用 |
+| **异步模型** | async/await + Event Loop | tokio + Future |
+| **超时控制** | AbortSignal | tokio::time::timeout |
+| **重定向** | 自动重连 + 重新握手 + 重发，限 16 次 | 同左 |
+| **认证** | 初期 SSS + host，GSI 可选 | 同左 |
+| **字节序** | `Buffer.writeInt32BE` 等内置方法 | `byteorder` crate |
+| **内存管理** | Buffer 自动 GC | 零拷贝 |
+| **文件句柄** | 4 字节句柄 → `Map<Buffer, FileHandle>` | 同左 |
 
 ---
 
@@ -1342,30 +1341,30 @@ xrootd-rs/
 
 ## 十四、MVP 文件清单
 
-**必须实现的文件（约 15 个）：**
+**必须实现的文件（约 12 个）：**
 
 ```
-# 协议定义
+# 协议层
 src/protocol/types.ts          # XPtypes.hh — 基础类型
-src/protocol/protocol.ts       # XProtocol.hh — 请求/响应结构
 src/protocol/constants.ts      # 请求码、响应码、错误码
+src/protocol/codec.ts          # 大端序编解码工具
+src/protocol/message.ts        # 消息帧构建/解析
 
-# 传输层
-src/transport/socket.ts        # XrdClSocket — TCP 连接
-src/transport/tls.ts           # XrdClTls — TLS 支持
-src/transport/message.ts       # XrdClMessage — 消息封装
-src/transport/transport.ts     # XrdClXRootDTransport — 协议传输
+# 三层传输架构
+src/transport/transport.ts     # Layer 1: net.Socket 封装
+src/transport/framer.ts        # Layer 2: 帧解析器
+src/transport/multiplexer.ts   # Layer 3: 多路复用器
 
-# 连接管理
-src/connection/channel.ts      # XrdClChannel — 连接通道
-src/connection/postmaster.ts   # XrdClPostMaster — 消息路由
+# 会话层
+src/session/handshake.ts       # 握手状态机（含 TLS 协商）
+src/session/auth.ts            # 认证框架
 
 # 用户 API
-src/api/file.ts                # XrdClFile — 文件操作
-src/api/filesystem.ts          # XrdClFileSystem — 文件系统操作
-src/api/url.ts                 # XrdClURL — URL 解析
-src/api/status.ts              # XrdClStatus — 状态码和错误码
-src/api/responses.ts           # XrdClXRootDResponses — 响应类型
+src/api/file.ts                # File 类
+src/api/filesystem.ts          # FileSystem 类
+src/api/errors.ts              # XRootDError 类
+src/api/types.ts               # StatInfo, LocationInfo 等
+src/url/url.ts                 # URL 解析
 ```
 
 ---
