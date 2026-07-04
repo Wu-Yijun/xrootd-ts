@@ -34,6 +34,7 @@ export const RequestId = {
   WriteV:    3031,
   Clone:     3032,
 } as const
+export type RequestId = typeof RequestId[keyof typeof RequestId]
 
 // ── Response Status Codes ──────────────────────────────────────────────────
 export const ResponseStatus = {
@@ -47,6 +48,7 @@ export const ResponseStatus = {
   Waitresp: 4006,
   Status:   4007,
 } as const
+export type ResponseStatus = typeof ResponseStatus[keyof typeof ResponseStatus]
 
 // ── Server Error Codes (kXR_error body errnum) ─────────────────────────────
 export const ServerError = {
@@ -87,6 +89,7 @@ export const ServerError = {
   ReqTimedOut:    3034,
   TimerExpired:   3035,
 } as const
+export type ServerError = typeof ServerError[keyof typeof ServerError]
 
 // ── Client Error Codes (library-internal) ──────────────────────────────────
 export const ClientError = {
@@ -113,6 +116,7 @@ export const ClientError = {
   Failed:            501,
   WinNetworkError:   601,
 } as const
+export type ClientError = typeof ClientError[keyof typeof ClientError]
 
 // ── Open Flags (kXR_open options field) ────────────────────────────────────
 export const OpenFlags = {
@@ -133,6 +137,7 @@ export const OpenFlags = {
   Seqio:    0x4000,
   Wrto:     0x8000,
 } as const
+export type OpenFlags = typeof OpenFlags[keyof typeof OpenFlags]
 
 // ── Protocol version (5.2.0) ──────────────────────────────────────────────
 export const PROTOCOL_VERSION = 0x00000520;

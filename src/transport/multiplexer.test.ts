@@ -1,5 +1,6 @@
 import { describe, it, beforeEach, afterEach } from 'node:test'
 import assert from 'node:assert/strict'
+import { setTimeout as sleep } from 'node:timers/promises'
 import { Multiplexer } from './multiplexer.ts'
 import type { ITransport } from './interface.ts'
 import type { Frame } from './framer.ts'
@@ -65,9 +66,8 @@ describe('Multiplexer', () => {
     const body = new Uint8Array(16)
     const responsePromise = mux.request(3006, body)
 
-    setTimeout(() => {
-      transport.simulateResponse(0, Buffer.alloc(0))
-    }, 1)
+    await sleep(1)
+    transport.simulateResponse(0, Buffer.alloc(0))
 
     const frame = await responsePromise
     assert.equal(frame.status, 0)
@@ -81,11 +81,10 @@ describe('Multiplexer', () => {
       mux.request(3007, bodies[1]),
     ]
 
-    setTimeout(() => {
-      const sids = transport.sentData.map(d => extractStreamId(d))
-      transport.simulateResponseFor(sids[1], 0, Buffer.alloc(0))
-      transport.simulateResponseFor(sids[0], 0, Buffer.alloc(0))
-    }, 1)
+    await sleep(1)
+    const sids = transport.sentData.map(d => extractStreamId(d))
+    transport.simulateResponseFor(sids[1], 0, Buffer.alloc(0))
+    transport.simulateResponseFor(sids[0], 0, Buffer.alloc(0))
 
     const [f1, f2] = await Promise.all(promises)
     assert.equal(f1.status, 0)
@@ -97,17 +96,13 @@ describe('Multiplexer', () => {
     const body = new Uint8Array(16)
     const responsePromise = mux.request(3006, body)
 
-    setTimeout(() => {
-      transport.simulateResponse(4005, (() => {
-        const b = Buffer.alloc(4)
-        b.writeInt32BE(2, 0)
-        return b
-      })())
+    await sleep(1)
+    const waitBody = Buffer.alloc(4)
+    waitBody.writeInt32BE(2, 0)
+    transport.simulateResponse(4005, waitBody)
 
-      setTimeout(() => {
-        transport.simulateResponse(0, Buffer.alloc(0))
-      }, 2100)
-    }, 1)
+    await sleep(2100)
+    transport.simulateResponse(0, Buffer.alloc(0))
 
     const frame = await responsePromise
     assert.equal(frame.status, 0)
@@ -120,7 +115,7 @@ describe('Multiplexer', () => {
 
     await assert.rejects(promise, /timeout/)
 
-    await new Promise<void>(resolve => setTimeout(resolve, 1100))
+    await sleep(1100)
   })
 
   it('close() rejects all pending', async () => {
