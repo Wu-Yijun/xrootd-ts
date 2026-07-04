@@ -93,20 +93,20 @@ describe('Multiplexer', () => {
   })
 
   it('kXR_wait (4005) triggers retry', async () => {
-    mux.setTimeout(5000)
+    mux.setTimeout(10000)
     const body = new Uint8Array(16)
     const responsePromise = mux.request(3006, body)
 
     setTimeout(() => {
       transport.simulateResponse(4005, (() => {
         const b = Buffer.alloc(4)
-        b.writeInt32BE(1, 0)
+        b.writeInt32BE(2, 0)
         return b
       })())
 
       setTimeout(() => {
         transport.simulateResponse(0, Buffer.alloc(0))
-      }, 1100)
+      }, 2100)
     }, 1)
 
     const frame = await responsePromise
@@ -119,6 +119,8 @@ describe('Multiplexer', () => {
     const promise = mux.request(3006, body)
 
     await assert.rejects(promise, /timeout/)
+
+    await new Promise<void>(resolve => setTimeout(resolve, 1100))
   })
 
   it('close() rejects all pending', async () => {

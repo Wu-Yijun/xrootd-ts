@@ -19,7 +19,7 @@ function createSimulatedServer(): Promise<{ server: net.Server; port: number }> 
     const server = net.createServer((socket) => {
       let buffer = Buffer.alloc(0)
 
-      socket.on('data', (chunk) => {
+      socket.on('data', (chunk: Buffer) => {
         buffer = Buffer.concat([buffer, chunk])
 
         // Process all complete messages
