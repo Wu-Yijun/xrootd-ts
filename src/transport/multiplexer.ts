@@ -41,6 +41,14 @@ export class Multiplexer {
         this.handleFrame(frame)
       }
     })
+
+    this.transport.onClose(() => {
+      this.rejectAll(new Error('Connection closed'))
+    })
+
+    this.transport.onError((err) => {
+      this.rejectAll(err)
+    })
   }
 
   private allocateStreamId(): number {
@@ -148,8 +156,12 @@ export class Multiplexer {
       this.sweepTimer = null
     }
 
+    this.rejectAll(new Error('Multiplexer closed'))
+  }
+
+  private rejectAll(err: Error): void {
     for (const [, req] of this.pending.entries()) {
-      req.reject(new Error('Multiplexer closed'))
+      req.reject(err)
     }
     this.pending.clear()
   }

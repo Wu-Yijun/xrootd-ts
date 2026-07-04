@@ -20,6 +20,8 @@ function extractStreamId(buf: Buffer): number {
 
 class MockTransport implements ITransport {
   private dataCallback: ((chunk: Buffer) => void) | null = null
+  private closeCallback: (() => void) | null = null
+  private errorCallback: ((err: Error) => void) | null = null
   sentData: Buffer[] = []
 
   async connect(): Promise<void> {}
@@ -34,6 +36,14 @@ class MockTransport implements ITransport {
     this.dataCallback = callback
   }
 
+  onClose(callback: () => void): void {
+    this.closeCallback = callback
+  }
+
+  onError(callback: (err: Error) => void): void {
+    this.errorCallback = callback
+  }
+
   simulateResponse(status: number, body: Buffer): void {
     if (this.dataCallback && this.sentData.length > 0) {
       const lastReq = this.sentData[this.sentData.length - 1]
@@ -46,6 +56,14 @@ class MockTransport implements ITransport {
     if (this.dataCallback) {
       this.dataCallback(buildResponseFrame(streamId, status, body))
     }
+  }
+
+  simulateClose(): void {
+    this.closeCallback?.()
+  }
+
+  simulateError(err: Error): void {
+    this.errorCallback?.(err)
   }
 }
 

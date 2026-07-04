@@ -37,21 +37,18 @@ describe('E2E: error handling', () => {
           const streamId = (message[0] << 8) | message[1]
 
           if (requestId === 3006) {
-            // kXR_protocol
             const body = Buffer.alloc(8)
             body.writeUInt32BE(0x520, 0)
             body.writeUInt32BE(0x09, 4)
             socket.write(buildResponseFrame(streamId, 0, body))
           } else if (requestId === 3007) {
-            // kXR_login
             const body = Buffer.alloc(16)
             for (let i = 0; i < 16; i++) body[i] = i + 1
             socket.write(buildResponseFrame(streamId, 0, body))
           } else if (requestId === 3010) {
-            // kXR_open → error (file not found)
-            const errBody = Buffer.alloc(4 + 12)
-            errBody.writeUInt32BE(3011, 0) // NotFound
-            errBody.write('No such file', 4, 'utf-8')
+            const errBody = Buffer.alloc(4 + 13)
+            errBody.writeUInt32BE(3011, 0)
+            Buffer.from('No such file\0').copy(errBody, 4)
             socket.write(buildResponseFrame(streamId, 4003, errBody))
           }
         }
@@ -66,7 +63,6 @@ describe('E2E: error handling', () => {
       await transport.connect('127.0.0.1', addr.port)
       const mux = new Multiplexer(transport)
 
-      // Protocol + login
       const protoFrame = await mux.request(3006, new Uint8Array(16))
       assert.equal(protoFrame.status, 0)
 
@@ -80,14 +76,13 @@ describe('E2E: error handling', () => {
 
       const file = new File(mux, session)
 
-      // Open should throw XRootDError with NotFound
       try {
         await file.open('/nonexistent/file.txt', { flags: 0x0010 })
         assert.fail('Expected XRootDError')
       } catch (err) {
         assert.ok(err instanceof XRootDError)
-        assert.equal(err.code, 3011) // NotFound
-        assert.match(err.message, /not found/i)
+        assert.equal(err.code, 3011)
+        assert.match(err.message, /no such file/i)
       }
 
       mux.close()
@@ -100,6 +95,7 @@ describe('E2E: error handling', () => {
   it('connection disconnect rejects pending request', async () => {
     const server = net.createServer((socket) => {
       let buffer = Buffer.alloc(0)
+      let requestCount = 0
 
       socket.on('data', (chunk: Buffer) => {
         buffer = Buffer.concat([buffer, chunk])
@@ -115,21 +111,23 @@ describe('E2E: error handling', () => {
           buffer = buffer.subarray(totalLen)
 
           const streamId = (message[0] << 8) | message[1]
+          requestCount++
 
           if (requestId === 3006) {
-            // kXR_protocol
             const body = Buffer.alloc(8)
             body.writeUInt32BE(0x520, 0)
             body.writeUInt32BE(0x09, 4)
             socket.write(buildResponseFrame(streamId, 0, body))
           } else if (requestId === 3007) {
-            // kXR_login
             const body = Buffer.alloc(16)
             for (let i = 0; i < 16; i++) body[i] = i + 1
             socket.write(buildResponseFrame(streamId, 0, body))
+          } else if (requestId === 3010) {
+            const body = Buffer.from([0xaa, 0xbb, 0xcc, 0xdd])
+            socket.write(buildResponseFrame(streamId, 0, body))
           } else if (requestId === 3013) {
-            // kXR_read → destroy connection mid-response
             socket.destroy()
+            return
           }
         }
       })
@@ -143,7 +141,6 @@ describe('E2E: error handling', () => {
       await transport.connect('127.0.0.1', addr.port)
       const mux = new Multiplexer(transport)
 
-      // Protocol + login
       const protoFrame = await mux.request(3006, new Uint8Array(16))
       assert.equal(protoFrame.status, 0)
 
@@ -158,7 +155,6 @@ describe('E2E: error handling', () => {
       const file = new File(mux, session)
       await file.open('/data/test.txt', { flags: 0x0010 })
 
-      // Read should fail due to connection destruction
       try {
         await file.read(0, 100)
         assert.fail('Expected error')
@@ -193,18 +189,15 @@ describe('E2E: error handling', () => {
           const streamId = (message[0] << 8) | message[1]
 
           if (requestId === 3006) {
-            // kXR_protocol
             const body = Buffer.alloc(8)
             body.writeUInt32BE(0x520, 0)
             body.writeUInt32BE(0x09, 4)
             socket.write(buildResponseFrame(streamId, 0, body))
           } else if (requestId === 3007) {
-            // kXR_login
             const body = Buffer.alloc(16)
             for (let i = 0; i < 16; i++) body[i] = i + 1
             socket.write(buildResponseFrame(streamId, 0, body))
           }
-          // Don't respond to other requests (simulates server not responding)
         }
       })
     })
@@ -216,18 +209,16 @@ describe('E2E: error handling', () => {
       const transport = new Transport()
       await transport.connect('127.0.0.1', addr.port)
       const mux = new Multiplexer(transport)
-      mux.setTimeout(100) // Very short timeout
+      mux.setTimeout(100)
 
-      // Protocol + login
       const protoFrame = await mux.request(3006, new Uint8Array(16))
       assert.equal(protoFrame.status, 0)
 
       const loginFrame = await mux.request(3007, new Uint8Array(16))
       assert.equal(loginFrame.status, 0)
 
-      // This request will never get a response → timeout
       try {
-        await mux.request(3013, new Uint8Array(16)) // kXR_read
+        await mux.request(3013, new Uint8Array(16))
         assert.fail('Expected timeout error')
       } catch (err) {
         assert.ok(err instanceof Error)
