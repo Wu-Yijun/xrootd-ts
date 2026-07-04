@@ -21,6 +21,8 @@ function extractStreamId(buf: Buffer): number {
 
 class MockTransportForFile implements ITransport {
   private dataCallback: ((chunk: Buffer) => void) | null = null
+  private closeCallback: (() => void) | null = null
+  private errorCallback: ((err: Error) => void) | null = null
   sentData: Buffer[] = []
   private responseQueue: ((streamId: number) => Buffer)[] = []
 
@@ -40,6 +42,14 @@ class MockTransportForFile implements ITransport {
 
   onData(callback: (chunk: Buffer) => void): void {
     this.dataCallback = callback
+  }
+
+  onClose(callback: () => void): void {
+    this.closeCallback = callback
+  }
+
+  onError(callback: (err: Error) => void): void {
+    this.errorCallback = callback
   }
 
   enqueueResponse(status: number, body: Buffer): void {

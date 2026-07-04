@@ -18,6 +18,8 @@ function extractStreamId(buf: Buffer): number {
 
 class MockTransportForHandshake {
   private dataCallback: ((chunk: Buffer) => void) | null = null
+  private closeCallback: (() => void) | null = null
+  private errorCallback: ((err: Error) => void) | null = null
   sentData: Buffer[] = []
 
   async connect(): Promise<void> {}
@@ -30,6 +32,14 @@ class MockTransportForHandshake {
 
   onData(callback: (chunk: Buffer) => void): void {
     this.dataCallback = callback
+  }
+
+  onClose(callback: () => void): void {
+    this.closeCallback = callback
+  }
+
+  onError(callback: (err: Error) => void): void {
+    this.errorCallback = callback
   }
 
   emit(data: Buffer): void {
