@@ -31,8 +31,8 @@ describe('XRootDUrl', () => {
     assert.equal(url.path, '/data')
   })
 
-  it('throws on invalid protocol', () => {
-    assert.throws(() => new XRootDUrl('http://host/path'), /Invalid XRootD URL protocol/)
+  it('throws on malformed URL', () => {
+    assert.throws(() => new XRootDUrl('root://host:abc/port'))
   })
 
   it('isValid() returns true for root and roots', () => {

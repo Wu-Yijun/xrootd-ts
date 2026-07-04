@@ -7,7 +7,6 @@ import {
   HANDSHAKE_FIFTH,
   REQUEST_HDR_SIZE,
 } from './constants.ts';
-import type { RequestId } from './constants.ts';
 import {
   put16,
   put32,

@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 import { Multiplexer } from './multiplexer.ts'
 import type { ITransport } from './interface.ts'
 import type { Frame } from './framer.ts'
+import { ResponseStatus } from '../protocol/constants.ts'
 
 function buildResponseFrame(streamId: number, status: number, body: Buffer): Buffer {
   const hdr = Buffer.alloc(8)
@@ -64,7 +65,6 @@ describe('Multiplexer', () => {
     const body = new Uint8Array(16)
     const responsePromise = mux.request(3006, body)
 
-    // Simulate response after a tick
     setTimeout(() => {
       transport.simulateResponse(0, Buffer.alloc(0))
     }, 1)
@@ -81,7 +81,6 @@ describe('Multiplexer', () => {
       mux.request(3007, bodies[1]),
     ]
 
-    // Capture streamIds from sent requests and respond in reverse order
     setTimeout(() => {
       const sids = transport.sentData.map(d => extractStreamId(d))
       transport.simulateResponseFor(sids[1], 0, Buffer.alloc(0))
@@ -99,14 +98,12 @@ describe('Multiplexer', () => {
     const responsePromise = mux.request(3006, body)
 
     setTimeout(() => {
-      // First response: kXR_wait with 1 second
       transport.simulateResponse(4005, (() => {
         const b = Buffer.alloc(4)
         b.writeInt32BE(1, 0)
         return b
       })())
 
-      // After 1 second, the retry should happen and we respond with ok
       setTimeout(() => {
         transport.simulateResponse(0, Buffer.alloc(0))
       }, 1100)
@@ -117,7 +114,7 @@ describe('Multiplexer', () => {
   })
 
   it('timeout rejects pending request', async () => {
-    mux.setTimeout(100) // 100ms timeout
+    mux.setTimeout(100)
     const body = new Uint8Array(16)
     const promise = mux.request(3006, body)
 

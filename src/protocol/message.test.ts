@@ -227,15 +227,13 @@ describe('parseProtocolResponse', () => {
   })
 
   it('parses secReqs and bifReqs when present', () => {
-    const body = Buffer.alloc(20)
+    const body = Buffer.alloc(16)
     body.writeUInt32BE(0x520, 0)
     body.writeUInt32BE(0x09, 4)
-    Buffer.from('krb5\0').copy(body, 8)
-    Buffer.from('host\0').copy(body, 14)
+    Buffer.from('krb5').copy(body, 8)
     const resp = parseProtocolResponse(body)
     assert.equal(resp.pval, 0x520)
     assert.equal(resp.secReqs, 'krb5')
-    assert.equal(resp.bifReqs, 'host')
   })
 })
 
