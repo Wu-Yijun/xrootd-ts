@@ -128,10 +128,10 @@ describe("FileSystem", () => {
       const readdirPromise = fs.readdir("/test");
       await sleep(1);
 
-      // Simulate dirlist response with NUL-separated entries
-      const entries = "file1.txt" + String.fromCharCode(0) +
-        "100:0:1700000000\n" +
-        "file2.txt" + String.fromCharCode(0) + "200:0:1700000001\n";
+      // Simulate dirlist response with dstat format (prefix + name/statinfo pairs)
+      const entries = ".\n0 0 0 0\n" +
+        "file1.txt\n0 100 0 1700000000\n" +
+        "file2.txt\n0 200 0 1700000001\n";
       const dirlistBody = Buffer.from(entries);
       transport.simulateResponse(0, dirlistBody);
 

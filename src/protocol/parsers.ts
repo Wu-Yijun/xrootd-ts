@@ -148,51 +148,50 @@ export function parseWaitResponse(body: Buffer): WaitResponse {
   return { seconds, infomsg };
 }
 
+const DSTAT_PREFIX = ".\n0 0 0 0";
+
 /**
  * Parse kXR_dirlist response body.
  *
  * Two possible formats depending on options:
- * 1. Names-only (kXR_online, default): `name\0name2\0name3\0` — null-separated
- * 2. With stat info (kXR_dstat): `name\0size:flags:mtime\n` — newline-separated
+ * 1. Names-only (kXR_online, default): `name1\nname2\nname3\0` — newline-separated, last entry null-terminated
+ * 2. With stat info (kXR_dstat): `.\n0 0 0 0\nname1\n<statinfo1>\nname2\n<statinfo2>\n...\0`
+ *    statinfo format: `<devid> <size> <flags> <mtime> <ctime> <atime> <mode> <owner> <group>`
  */
 export function parseDirlistResponse(body: Buffer): DirlistResponse {
   const entries: DirectoryEntry[] = [];
 
   if (body.length === 0) return { entries };
 
-  const hasMetadata = body.toString("utf8").includes("\0") &&
-    body.toString("utf8").includes(":");
+  const text = body.toString("utf8").replace(/\0$/, "");
 
-  if (hasMetadata) {
-    const text = body.toString("utf8");
-    const lines = text.split("\n").filter((l) => l.length > 0);
+  // Detect dstat format by prefix
+  if (text.startsWith(DSTAT_PREFIX)) {
+    // dstat format: ".\n0 0 0 0\nname1\nstatinfo1\nname2\nstatinfo2\n..."
+    const content = text.slice(DSTAT_PREFIX.length + 1); // skip prefix + \n
+    const lines = content.split("\n").filter((l) => l.length > 0);
 
-    for (const line of lines) {
-      const nulIdx = line.indexOf(String.fromCharCode(0));
-      if (nulIdx === -1) continue;
-
-      const name = line.substring(0, nulIdx);
-      const rest = line.substring(nulIdx + 1);
-      const fields = rest.split(":");
-
-      if (fields.length >= 3) {
+    // Lines come in pairs: name, statinfo
+    for (let i = 0; i < lines.length - 1; i += 2) {
+      const name = lines[i];
+      const statFields = lines[i + 1]?.split(/\s+/);
+      if (statFields && statFields.length >= 4) {
         entries.push({
           name,
-          size: parseInt(fields[0], 10) || 0,
-          flags: parseInt(fields[1], 10) || 0,
-          mtime: parseInt(fields[2], 10) || 0,
+          size: parseInt(statFields[1], 10) || 0,
+          flags: parseInt(statFields[2], 10) || 0,
+          mtime: parseInt(statFields[3], 10) || 0,
         });
       }
     }
   } else {
-    const text = body.toString("utf8");
-    const parts = text.split("\0");
-
-    for (const part of parts) {
-      const name = part.trim();
-      if (name.length > 0) {
+    // Normal format: newline-separated, last entry null-terminated
+    const names = text.split("\n");
+    for (const name of names) {
+      const trimmed = name.trim();
+      if (trimmed.length > 0) {
         entries.push({
-          name,
+          name: trimmed,
           size: 0,
           flags: 0,
           mtime: 0,

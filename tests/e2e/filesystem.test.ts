@@ -75,8 +75,9 @@ function createFileSystemServer(): Promise<
 
             if (parentDir && parentDir.has(name)) {
               const entry = parentDir.get(name)!;
-              const flags = entry.isDir ? 0x4000 : 0;
-              const statBody = Buffer.from(`0 0 0 ${flags}`);
+              const xrdFlags = entry.isDir ? 2 : 0; // kXR_isDir
+              const mode = entry.isDir ? "040755" : "100644";
+              const statBody = Buffer.from(`0 0 ${xrdFlags} 0 0 0 ${mode} root root`);
               socket.write(buildResponseFrame(streamId, 0, statBody));
             } else {
               const errBody = Buffer.alloc(4 + 13);
@@ -89,15 +90,14 @@ function createFileSystemServer(): Promise<
             const path = reqBody.toString("utf8").replace(/\0+$/, "");
             const dir = dirs.get(path);
             if (dir) {
-              const entries: Buffer[] = [];
+              const entries: string[] = [];
+              entries.push(".\n0 0 0 0"); // dstat prefix
               for (const [name, info] of dir) {
-                const flags = info.isDir ? 0x4000 : 0;
-                const entry = Buffer.from(`${name}\x000:0:${flags}\n`);
-                entries.push(entry);
+                const xrdFlags = info.isDir ? 2 : 0;
+                const mode = info.isDir ? "040755" : "100644";
+                entries.push(`${name}\n0 0 ${xrdFlags} 0 0 0 ${mode} root root`);
               }
-              const body = entries.length > 0
-                ? Buffer.concat(entries)
-                : Buffer.alloc(0);
+              const body = Buffer.from(entries.join("\n") + "\n");
               socket.write(buildResponseFrame(streamId, 0, body));
             } else {
               const errBody = Buffer.alloc(4 + 13);
