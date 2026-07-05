@@ -56,7 +56,7 @@ export function checkServerAvailable(): Promise<boolean> {
 }
 
 export async function skipIfServerUnavailable(
-  this: TestContext,
+  ctx?: TestContext,
 ): Promise<void> {
   const available = await checkServerAvailable();
   if (!available) {
@@ -64,7 +64,11 @@ export async function skipIfServerUnavailable(
       `  ⏭ Skipping: xrootd mock server not available at ${XROOTD_HOST}:${XROOTD_PORT}`,
     );
     console.log(`     Start it with: pnpm mock-server:up`);
-    this.skip();
+    if (ctx?.skip) {
+      ctx.skip();
+    } else if (typeof (this as any)?.skip === "function") {
+      (this as any).skip();
+    }
   }
 }
 
