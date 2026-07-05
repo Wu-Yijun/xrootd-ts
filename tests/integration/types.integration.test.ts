@@ -211,7 +211,7 @@ describe("Integration: XRootDError class", () => {
     );
     assert.equal(
       XRootDError.codeToMessage(ServerError.NotAuthorized),
-      "Permission denied",
+      "Not authorized",
     );
     assert.equal(
       XRootDError.codeToMessage(ServerError.ItExists),
@@ -227,7 +227,7 @@ describe("Integration: XRootDError class", () => {
     );
     assert.equal(
       XRootDError.codeToMessage(ClientError.Disconnected),
-      "Connection closed unexpectedly",
+      "Disconnected",
     );
   });
 
