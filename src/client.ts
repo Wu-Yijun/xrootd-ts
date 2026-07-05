@@ -4,7 +4,6 @@ import { Multiplexer } from "./transport/multiplexer.ts";
 import { handshake } from "./session/handshake.ts";
 import { doAuthentication, registerAuthProtocol } from "./session/auth.ts";
 import { HostAuth } from "./security/host.ts";
-import { SSSAuth } from "./security/sss.ts";
 import { File } from "./api/file.ts";
 import { FileSystem } from "./api/filesystem.ts";
 import type { Session } from "./session/handshake.ts";
@@ -59,7 +58,6 @@ export class XRootDClient {
 
     // Register supported authentication protocols
     registerAuthProtocol("host", () => new HostAuth());
-    registerAuthProtocol("sss", () => new SSSAuth());
 
     // Perform authentication if server requires it and credentials are provided
     if (this.session.secReqs && this.options.credentials) {
