@@ -155,6 +155,7 @@ describe("E2E: redirect flow", () => {
       const session: Session = {
         sessid: new Uint8Array(loginFrame2.body.subarray(0, 16)),
         protocolVersion: 0x520,
+        needsAuth: false,
       };
 
       const file = new File(mux2, session);

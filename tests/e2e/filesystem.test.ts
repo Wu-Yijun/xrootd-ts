@@ -249,6 +249,7 @@ async function setupSession(port: number): Promise<{
   const session: Session = {
     sessid: new Uint8Array(loginFrame.body.subarray(0, 16)),
     protocolVersion: 0x520,
+    needsAuth: false,
   };
 
   const fs = new FileSystem(mux);

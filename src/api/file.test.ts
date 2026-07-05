@@ -66,6 +66,7 @@ class MockTransportForFile implements ITransport {
 const testSession: Session = {
   sessid: new Uint8Array(16),
   protocolVersion: 0x520,
+  needsAuth: false,
 };
 
 function buildOpenBody(fhandle: Buffer): Buffer {

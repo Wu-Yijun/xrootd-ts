@@ -78,6 +78,7 @@ describe("E2E: error handling", () => {
       const session: Session = {
         sessid: new Uint8Array(loginFrame.body.subarray(0, 16)),
         protocolVersion: 0x520,
+        needsAuth: false,
       };
 
       const file = new File(mux, session);
@@ -158,6 +159,7 @@ describe("E2E: error handling", () => {
       const session: Session = {
         sessid: new Uint8Array(loginFrame.body.subarray(0, 16)),
         protocolVersion: 0x520,
+        needsAuth: false,
       };
 
       const file = new File(mux, session);
