@@ -27,14 +27,19 @@ export async function doAuthentication(
   mux: Multiplexer,
   secReqs: string,
   params: AuthParams,
+  options?: { protocolFilter?: string[] },
 ): Promise<SecEntity> {
   if (!secReqs || secReqs.trim().length === 0) {
     return { prot: "", uid: 0, gid: 0 };
   }
 
   const supportedProtocols = secReqs.split(",").map((s) => s.trim());
+  const filter = options?.protocolFilter;
+  const candidates = filter?.length
+    ? supportedProtocols.filter((p) => filter.includes(p))
+    : supportedProtocols;
 
-  for (const protoName of supportedProtocols) {
+  for (const protoName of candidates) {
     const factory = authProtocols.get(protoName);
     if (!factory) continue;
 
@@ -44,7 +49,8 @@ export async function doAuthentication(
 
   throw new XRootDError(
     ServerError.AuthFailed,
-    `No supported authentication protocol. Server requires: ${secReqs}`,
+    `No supported authentication protocol. Server requires: ${secReqs}` +
+      (filter ? `. Allowed: ${filter.join(",")}` : ""),
   );
 }
 
