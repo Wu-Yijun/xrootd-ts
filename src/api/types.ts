@@ -11,7 +11,7 @@ export interface StatInfo {
   id: number;
   size: number;
   mtime: number;
-  flags: number;
+  mode: number;
   get isDirectory(): boolean;
   get isLink(): boolean;
   get isOffline(): boolean;
@@ -30,7 +30,7 @@ export function createStatInfo(data: string): StatInfo {
     id,
     size,
     mtime,
-    flags: mode,
+    mode,
     get isDirectory() {
       return (mode & S_IFDIR) !== 0;
     },
