@@ -1,7 +1,7 @@
 import type { ITransport } from "./interface.ts";
 import { type Frame, Framer } from "./framer.ts";
 import { Message } from "../protocol/message.ts";
-import { ClientError, ResponseStatus } from "../protocol/constants.ts";
+import { ResponseStatus } from "../protocol/constants.ts";
 import { parseRedirectResponse } from "../protocol/message.ts";
 
 interface PendingRequest {

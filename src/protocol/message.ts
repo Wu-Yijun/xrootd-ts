@@ -4,17 +4,13 @@ import {
   HANDSHAKE_FOURTH,
   HANDSHAKE_SECOND,
   HANDSHAKE_THIRD,
+  kXR_ExpLogin,
+  kXR_secreqs,
   PROTOCOL_VERSION,
   REQUEST_HDR_SIZE,
   RequestId,
-  kXR_ExpLogin,
-  kXR_secreqs,
 } from "./constants.ts";
-import {
-  get32,
-  getBytes,
-  getString,
-} from "./codec.ts";
+import { get32, getBytes, getString } from "./codec.ts";
 
 // ── Response interfaces ────────────────────────────────────────────────────
 

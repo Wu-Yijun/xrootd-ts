@@ -4,8 +4,11 @@ import type {
   SecurityProtocol,
 } from "../security/interface.ts";
 import type { Multiplexer } from "../transport/multiplexer.ts";
-import type { Frame } from "../transport/framer.ts";
-import { RequestId, ResponseStatus, ServerError } from "../protocol/constants.ts";
+import {
+  RequestId,
+  ResponseStatus,
+  ServerError,
+} from "../protocol/constants.ts";
 import { parseErrorResponse } from "../protocol/message.ts";
 import { XRootDError } from "../api/errors.ts";
 

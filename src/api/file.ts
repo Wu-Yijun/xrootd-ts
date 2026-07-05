@@ -11,9 +11,13 @@ import {
   parseErrorResponse,
   parseOpenResponse,
 } from "../protocol/message.ts";
-import { OpenFlags, ResponseStatus, ServerError } from "../protocol/constants.ts";
+import {
+  OpenFlags,
+  ResponseStatus,
+  ServerError,
+} from "../protocol/constants.ts";
 import { XRootDError } from "./errors.ts";
-import { type StatInfo, createStatInfo } from "./types.ts";
+import { createStatInfo, type StatInfo } from "./types.ts";
 
 export class File {
   private mux: Multiplexer;
