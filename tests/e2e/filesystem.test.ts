@@ -77,7 +77,9 @@ function createFileSystemServer(): Promise<
               const entry = parentDir.get(name)!;
               const xrdFlags = entry.isDir ? 2 : 0; // kXR_isDir
               const mode = entry.isDir ? "040755" : "100644";
-              const statBody = Buffer.from(`0 0 ${xrdFlags} 0 0 0 ${mode} root root`);
+              const statBody = Buffer.from(
+                `0 0 ${xrdFlags} 0 0 0 ${mode} root root`,
+              );
               socket.write(buildResponseFrame(streamId, 0, statBody));
             } else {
               const errBody = Buffer.alloc(4 + 13);
@@ -95,7 +97,9 @@ function createFileSystemServer(): Promise<
               for (const [name, info] of dir) {
                 const xrdFlags = info.isDir ? 2 : 0;
                 const mode = info.isDir ? "040755" : "100644";
-                entries.push(`${name}\n0 0 ${xrdFlags} 0 0 0 ${mode} root root`);
+                entries.push(
+                  `${name}\n0 0 ${xrdFlags} 0 0 0 ${mode} root root`,
+                );
               }
               const body = Buffer.from(entries.join("\n") + "\n");
               socket.write(buildResponseFrame(streamId, 0, body));

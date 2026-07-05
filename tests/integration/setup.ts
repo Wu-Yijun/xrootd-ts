@@ -1,5 +1,5 @@
 import { createConnection } from "node:net";
-import { mkdtemp, rm, writeFile, mkdir } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { TestContext } from "node:test";
@@ -19,7 +19,8 @@ export const TEST_FILE_PATH = "/data/test/testfile.txt";
 export const EXPECTED_FILE_CONTENTS = "Hello, XRootD!\n" +
   "This is a test file for the mock server.\n" +
   "Line 3: Testing basic file operations.\n" +
-  "Line 4: Reading offset and size should work.\n" + "Line 5: End of test file.\n";
+  "Line 4: Reading offset and size should work.\n" +
+  "Line 5: End of test file.\n";
 
 export const TEST_WRITE_DIR = "/data/test/integration";
 

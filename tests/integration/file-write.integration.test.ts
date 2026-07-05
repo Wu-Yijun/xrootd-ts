@@ -5,15 +5,15 @@ import { FileSystem } from "../../src/api/filesystem.ts";
 import { XRootDError } from "../../src/api/errors.ts";
 import { OpenFlags } from "../../src/protocol/constants.ts";
 import {
-  skipIfServerUnavailable,
-  withTimeout,
-  createConnectedLowLevel,
   closeLowLevel,
   createConnectedClient,
+  createConnectedLowLevel,
   ensureTestWriteDir,
   randomTestId,
-  testFilePath,
+  skipIfServerUnavailable,
   TEST_WRITE_DIR,
+  testFilePath,
+  withTimeout,
   XROOTD_HOST,
   XROOTD_PORT,
 } from "./setup.ts";
@@ -38,7 +38,11 @@ describe("Integration: File.write", () => {
       const file2 = new File(mux, session);
       await file2.open(path, { flags: OpenFlags.Read });
       const info = await file2.stat();
-      assert.equal(info.size, BigInt(data.byteLength), "file size should match written data");
+      assert.equal(
+        info.size,
+        BigInt(data.byteLength),
+        "file size should match written data",
+      );
       await file2.close();
     } finally {
       await closeLowLevel({ transport, mux, session });
@@ -103,7 +107,11 @@ describe("Integration: File.write", () => {
       await file2.open(path, { flags: OpenFlags.Read });
       const data = await file2.read(0, 17);
       const text = new TextDecoder().decode(data);
-      assert.equal(text, "Part1-Part2-Part3", "multiple writes should concatenate");
+      assert.equal(
+        text,
+        "Part1-Part2-Part3",
+        "multiple writes should concatenate",
+      );
       await file2.close();
     } finally {
       await closeLowLevel({ transport, mux, session });

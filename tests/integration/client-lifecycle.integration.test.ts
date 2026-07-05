@@ -4,14 +4,14 @@ import { XRootDClient } from "../../src/client.ts";
 import { XRootDError } from "../../src/api/errors.ts";
 import { OpenFlags } from "../../src/protocol/constants.ts";
 import {
-  skipIfServerUnavailable,
-  withTimeout,
   createConnectedClient,
   ensureTestWriteDir,
   randomTestId,
-  testFilePath,
-  TEST_FILE_PATH,
   SERVER_URL,
+  skipIfServerUnavailable,
+  TEST_FILE_PATH,
+  testFilePath,
+  withTimeout,
   XROOTD_HOST,
   XROOTD_PORT,
 } from "./setup.ts";
@@ -21,9 +21,17 @@ describe("Integration: XRootDClient lifecycle", () => {
 
   it("connect sets isConnected = true", async () => {
     const client = new XRootDClient(SERVER_URL);
-    assert.equal(client.isConnected, false, "should not be connected before connect()");
+    assert.equal(
+      client.isConnected,
+      false,
+      "should not be connected before connect()",
+    );
     await withTimeout(client.connect(), 5000, "client.connect()");
-    assert.equal(client.isConnected, true, "should be connected after connect()");
+    assert.equal(
+      client.isConnected,
+      true,
+      "should be connected after connect()",
+    );
     await client.close();
   });
 
@@ -32,7 +40,11 @@ describe("Integration: XRootDClient lifecycle", () => {
     await withTimeout(client.connect(), 5000, "client.connect()");
     assert.equal(client.isConnected, true);
     await client.close();
-    assert.equal(client.isConnected, false, "should not be connected after close()");
+    assert.equal(
+      client.isConnected,
+      false,
+      "should not be connected after close()",
+    );
   });
 
   it("location returns correct URL string", async () => {
@@ -160,10 +172,22 @@ describe("Integration: XRootDClient stat methods", () => {
       assert.equal(typeof info.mode, "number", "mode should be number");
       assert.equal(typeof info.owner, "string", "owner should be string");
       assert.equal(typeof info.group, "string", "group should be string");
-      assert.equal(typeof info.isDirectory, "boolean", "isDirectory should be boolean");
+      assert.equal(
+        typeof info.isDirectory,
+        "boolean",
+        "isDirectory should be boolean",
+      );
       assert.equal(typeof info.isLink, "boolean", "isLink should be boolean");
-      assert.equal(typeof info.isOffline, "boolean", "isOffline should be boolean");
-      assert.equal(typeof info.isCached, "boolean", "isCached should be boolean");
+      assert.equal(
+        typeof info.isOffline,
+        "boolean",
+        "isOffline should be boolean",
+      );
+      assert.equal(
+        typeof info.isCached,
+        "boolean",
+        "isCached should be boolean",
+      );
     } finally {
       await client.close();
     }

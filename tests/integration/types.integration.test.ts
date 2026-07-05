@@ -6,24 +6,24 @@ import { XRootDError } from "../../src/api/errors.ts";
 import { XRootDUrl } from "../../src/url/url.ts";
 import { createStatInfo } from "../../src/api/types.ts";
 import {
-  OpenFlags,
-  ServerError,
   ClientError,
-  StatFlags,
-  DirlistOptions,
   CRED_TYPE,
-  PROTOCOL_VERSION,
   DEFAULT_PORT,
+  DirlistOptions,
+  OpenFlags,
+  PROTOCOL_VERSION,
   S_IFDIR,
   S_IFLNK,
+  ServerError,
+  StatFlags,
 } from "../../src/protocol/constants.ts";
 import {
-  skipIfServerUnavailable,
-  createConnectedLowLevel,
   closeLowLevel,
   createConnectedClient,
-  TEST_FILE_PATH,
+  createConnectedLowLevel,
   SERVER_URL,
+  skipIfServerUnavailable,
+  TEST_FILE_PATH,
   XROOTD_HOST,
   XROOTD_PORT,
 } from "./setup.ts";
@@ -46,10 +46,22 @@ describe("Integration: StatInfo type validation", () => {
       assert.equal(typeof info.owner, "string", "owner should be string");
       assert.equal(typeof info.group, "string", "group should be string");
 
-      assert.equal(typeof info.isDirectory, "boolean", "isDirectory should be boolean");
+      assert.equal(
+        typeof info.isDirectory,
+        "boolean",
+        "isDirectory should be boolean",
+      );
       assert.equal(typeof info.isLink, "boolean", "isLink should be boolean");
-      assert.equal(typeof info.isOffline, "boolean", "isOffline should be boolean");
-      assert.equal(typeof info.isCached, "boolean", "isCached should be boolean");
+      assert.equal(
+        typeof info.isOffline,
+        "boolean",
+        "isOffline should be boolean",
+      );
+      assert.equal(
+        typeof info.isCached,
+        "boolean",
+        "isCached should be boolean",
+      );
     } finally {
       await client.close();
     }
@@ -76,7 +88,8 @@ describe("Integration: StatInfo type validation", () => {
   });
 
   it("createStatInfo parser returns correct types", () => {
-    const statStr = "12345 6789 3 1700000000 1700000100 1700000200 100644 root group";
+    const statStr =
+      "12345 6789 3 1700000000 1700000100 1700000200 100644 root group";
     const info = createStatInfo(statStr);
 
     assert.equal(typeof info.id, "string");
@@ -130,7 +143,11 @@ describe("Integration: DirectoryEntry type validation", () => {
     const client = await createConnectedClient();
     try {
       const list = await client.readdir("/data/test");
-      assert.equal(list.name, "/data/test", "list.name should match requested path");
+      assert.equal(
+        list.name,
+        "/data/test",
+        "list.name should match requested path",
+      );
     } finally {
       await client.close();
     }
@@ -189,12 +206,30 @@ describe("Integration: DirlistOptions constants", () => {
 
 describe("Integration: XRootDError class", () => {
   it("codeToMessage returns correct messages for known codes", () => {
-    assert.equal(XRootDError.codeToMessage(ServerError.NotFound), "File not found");
-    assert.equal(XRootDError.codeToMessage(ServerError.NotAuthorized), "Permission denied");
-    assert.equal(XRootDError.codeToMessage(ServerError.ItExists), "File already exists");
-    assert.equal(XRootDError.codeToMessage(ServerError.IsDirectory), "Is a directory");
-    assert.equal(XRootDError.codeToMessage(ClientError.Timeout), "Request timed out");
-    assert.equal(XRootDError.codeToMessage(ClientError.Disconnected), "Connection closed unexpectedly");
+    assert.equal(
+      XRootDError.codeToMessage(ServerError.NotFound),
+      "File not found",
+    );
+    assert.equal(
+      XRootDError.codeToMessage(ServerError.NotAuthorized),
+      "Permission denied",
+    );
+    assert.equal(
+      XRootDError.codeToMessage(ServerError.ItExists),
+      "File already exists",
+    );
+    assert.equal(
+      XRootDError.codeToMessage(ServerError.IsDirectory),
+      "Is a directory",
+    );
+    assert.equal(
+      XRootDError.codeToMessage(ClientError.Timeout),
+      "Request timed out",
+    );
+    assert.equal(
+      XRootDError.codeToMessage(ClientError.Disconnected),
+      "Connection closed unexpectedly",
+    );
   });
 
   it("codeToMessage returns fallback for unknown codes", () => {

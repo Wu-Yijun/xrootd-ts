@@ -5,12 +5,12 @@ import { FileSystem } from "../../src/api/filesystem.ts";
 import { XRootDError } from "../../src/api/errors.ts";
 import { OpenFlags } from "../../src/protocol/constants.ts";
 import {
-  skipIfServerUnavailable,
-  createConnectedLowLevel,
   closeLowLevel,
+  createConnectedLowLevel,
   randomTestId,
-  testFilePath,
+  skipIfServerUnavailable,
   TEST_WRITE_DIR,
+  testFilePath,
 } from "./setup.ts";
 
 describe("Integration: FileSystem.mkdir", () => {
@@ -24,7 +24,11 @@ describe("Integration: FileSystem.mkdir", () => {
       await fs.mkdir(dirPath);
 
       const info = await fs.stat(dirPath);
-      assert.equal(info.isDirectory, true, "created path should be a directory");
+      assert.equal(
+        info.isDirectory,
+        true,
+        "created path should be a directory",
+      );
     } finally {
       await closeLowLevel({ transport, mux, session });
     }
@@ -228,10 +232,26 @@ describe("Integration: FileSystem.readdir edge cases", () => {
       assert.ok(list.entries.length > 0, "should have entries");
 
       for (const entry of list.entries) {
-        assert.equal(typeof entry.name, "string", "entry.name should be string");
-        assert.equal(typeof entry.size, "number", "entry.size should be number");
-        assert.equal(typeof entry.flags, "number", "entry.flags should be number");
-        assert.equal(typeof entry.mtime, "number", "entry.mtime should be number");
+        assert.equal(
+          typeof entry.name,
+          "string",
+          "entry.name should be string",
+        );
+        assert.equal(
+          typeof entry.size,
+          "number",
+          "entry.size should be number",
+        );
+        assert.equal(
+          typeof entry.flags,
+          "number",
+          "entry.flags should be number",
+        );
+        assert.equal(
+          typeof entry.mtime,
+          "number",
+          "entry.mtime should be number",
+        );
       }
     } finally {
       await closeLowLevel({ transport, mux, session });
