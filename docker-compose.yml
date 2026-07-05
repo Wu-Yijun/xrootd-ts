@@ -10,7 +10,8 @@ services:
       - ./mock-server/data:/data
     healthcheck:
       test: ["CMD-SHELL", "bash -c 'echo test > /dev/tcp/localhost/1094'"]
-      interval: 10s
-      timeout: 5s
-      retries: 3
+      interval: 2s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
     restart: unless-stopped

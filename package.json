@@ -1,6 +1,6 @@
 {
   "name": "xrootd",
-  "version": "1.0.0-beta.4",
+  "version": "1.0.0-beta.5",
   "description": "A TypeScript client library for the XRootD protocol",
   "main": "dist/index.mjs",
   "types": "dist/index.d.mts",
@@ -19,7 +19,7 @@
     "test:e2e": "node --experimental-strip-types --test tests/e2e/**/*.test.ts",
     "test:integration": "node tests/integration/prepare.ts && node --experimental-strip-types --test tests/integration/**/*.test.ts",
     "test:all": "pnpm test && pnpm test:integration && pnpm test:e2e ",
-    "mock-server:up": "docker compose up -d",
+    "mock-server:up": "docker compose up -d --wait",
     "mock-server:down": "docker compose down",
     "mock-server:logs": "docker compose logs -f xrootd-mock",
     "mock-server:verify": "node --experimental-strip-types scripts/verify-mock-server.ts"
