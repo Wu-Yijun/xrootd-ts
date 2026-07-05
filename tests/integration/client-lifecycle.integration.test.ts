@@ -10,6 +10,7 @@ import {
   SERVER_URL,
   skipIfServerUnavailable,
   TEST_FILE_PATH,
+  TEST_WRITE_DIR,
   testFilePath,
   withTimeout,
   XROOTD_HOST,

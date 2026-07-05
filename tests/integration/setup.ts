@@ -10,6 +10,7 @@ import { XRootDUrl } from "../../src/url/url.ts";
 import { File } from "../../src/api/file.ts";
 import { FileSystem } from "../../src/api/filesystem.ts";
 import type { Session } from "../../src/session/handshake.ts";
+import { XRootDClient } from "../../src/client.ts";
 
 export const XROOTD_HOST = process.env.XROOTD_HOST || "localhost";
 export const XROOTD_PORT = parseInt(process.env.XROOTD_PORT || "1094", 10);
@@ -94,7 +95,6 @@ export async function closeLowLevel(conn: ConnectedLowLevel): Promise<void> {
 }
 
 export async function createConnectedClient() {
-  const { default: { XRootDClient } } = await import("../../src/client.ts");
   const client = new XRootDClient(SERVER_URL);
   await withTimeout(client.connect(), 5000, "client.connect()");
   return client;

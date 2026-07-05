@@ -4,7 +4,7 @@ import { File } from "../../src/api/file.ts";
 import { FileSystem } from "../../src/api/filesystem.ts";
 import { XRootDError } from "../../src/api/errors.ts";
 import { XRootDUrl } from "../../src/url/url.ts";
-import { createStatInfo } from "../../src/api/types.ts";
+import { createStatInfo, StatFlags } from "../../src/api/types.ts";
 import {
   ClientError,
   CRED_TYPE,
@@ -15,7 +15,6 @@ import {
   S_IFDIR,
   S_IFLNK,
   ServerError,
-  StatFlags,
 } from "../../src/protocol/constants.ts";
 import {
   closeLowLevel,
