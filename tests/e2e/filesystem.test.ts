@@ -187,7 +187,7 @@ function createFileSystemServer(): Promise<
             const arg1len = message.readUInt16BE(18);
             const source = reqBody.subarray(0, arg1len).toString("utf8")
               .replace(/\0+$/, "");
-            const target = reqBody.subarray(arg1len).toString("utf8").replace(
+            const target = reqBody.subarray(arg1len + 1).toString("utf8").replace(
               /\0+$/,
               "",
             );
@@ -257,9 +257,14 @@ async function setupSession(port: number): Promise<{
 describe("E2E: FileSystem lifecycle", () => {
   it("mkdir -> readdir -> mv -> rm -> rmdir", async () => {
     const { server, port } = await createFileSystemServer();
+    let mux: Multiplexer | undefined;
+    let transport: Transport | undefined;
 
     try {
-      const { mux, transport, fs } = await setupSession(port);
+      const session = await setupSession(port);
+      mux = session.mux;
+      transport = session.transport;
+      const fs = session.fs;
 
       // mkdir
       await fs.mkdir("/data/test/newdir");
@@ -297,19 +302,23 @@ describe("E2E: FileSystem lifecycle", () => {
         !names3.includes("renameddir"),
         "should not contain renameddir after rmdir",
       );
-
-      mux.close();
-      await transport.close();
     } finally {
+      mux?.close();
+      await transport?.close();
       server.close();
     }
   });
 
   it("mkdir on existing directory throws", async () => {
     const { server, port } = await createFileSystemServer();
+    let mux: Multiplexer | undefined;
+    let transport: Transport | undefined;
 
     try {
-      const { mux, transport, fs } = await setupSession(port);
+      const session = await setupSession(port);
+      mux = session.mux;
+      transport = session.transport;
+      const fs = session.fs;
 
       try {
         await fs.mkdir("/data/test");
@@ -317,19 +326,23 @@ describe("E2E: FileSystem lifecycle", () => {
       } catch (err) {
         assert.ok(err instanceof Error);
       }
-
-      mux.close();
-      await transport.close();
     } finally {
+      mux?.close();
+      await transport?.close();
       server.close();
     }
   });
 
   it("rmdir on non-empty directory throws", async () => {
     const { server, port } = await createFileSystemServer();
+    let mux: Multiplexer | undefined;
+    let transport: Transport | undefined;
 
     try {
-      const { mux, transport, fs } = await setupSession(port);
+      const session = await setupSession(port);
+      mux = session.mux;
+      transport = session.transport;
+      const fs = session.fs;
 
       try {
         await fs.rmdir("/data/test");
@@ -337,19 +350,23 @@ describe("E2E: FileSystem lifecycle", () => {
       } catch (err) {
         assert.ok(err instanceof Error);
       }
-
-      mux.close();
-      await transport.close();
     } finally {
+      mux?.close();
+      await transport?.close();
       server.close();
     }
   });
 
   it("rm on non-existent file throws", async () => {
     const { server, port } = await createFileSystemServer();
+    let mux: Multiplexer | undefined;
+    let transport: Transport | undefined;
 
     try {
-      const { mux, transport, fs } = await setupSession(port);
+      const session = await setupSession(port);
+      mux = session.mux;
+      transport = session.transport;
+      const fs = session.fs;
 
       try {
         await fs.rm("/data/test/nonexistent.txt");
@@ -357,19 +374,23 @@ describe("E2E: FileSystem lifecycle", () => {
       } catch (err) {
         assert.ok(err instanceof Error);
       }
-
-      mux.close();
-      await transport.close();
     } finally {
+      mux?.close();
+      await transport?.close();
       server.close();
     }
   });
 
   it("rm file succeeds", async () => {
     const { server, port } = await createFileSystemServer();
+    let mux: Multiplexer | undefined;
+    let transport: Transport | undefined;
 
     try {
-      const { mux, transport, fs } = await setupSession(port);
+      const session = await setupSession(port);
+      mux = session.mux;
+      transport = session.transport;
+      const fs = session.fs;
 
       // Create a file to remove
       await fs.mkdir("/data/test/dirwithfile");
@@ -385,10 +406,9 @@ describe("E2E: FileSystem lifecycle", () => {
         !names.includes("file.txt"),
         "should not contain file.txt after rm",
       );
-
-      mux.close();
-      await transport.close();
     } finally {
+      mux?.close();
+      await transport?.close();
       server.close();
     }
   });
