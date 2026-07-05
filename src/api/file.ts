@@ -13,17 +13,7 @@ import {
 } from "../protocol/message.ts";
 import { ResponseStatus } from "../protocol/constants.ts";
 import { XRootDError } from "./errors.ts";
-
-export interface StatInfo {
-  id: number;
-  size: number;
-  mtime: number;
-  flags: number;
-  get isDirectory(): boolean;
-  get isLink(): boolean;
-  get isOffline(): boolean;
-  get isCached(): boolean;
-}
+import type { StatInfo } from "./types.ts";
 
 export class File {
   private mux: Multiplexer;
