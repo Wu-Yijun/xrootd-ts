@@ -692,7 +692,7 @@ export async function handshake(mux: Multiplexer): Promise<Uint8Array> {
   protoReq.writeInt32BE(0)                // clientpv 高位 + flags
   // ... flags, expect, reserved, dlen 字段
 
-  // Step 2: 接收服务器握手响应 (ServerResponseHeader 8B + ServerInitHandShake 12B = 20B)
+  // Step 2: 接收服务器握手响应帧 (ServerResponseHeader.dlen 与 ServerInitHandShake.msglen 共享，总计 16B)
   // 由 Framer 处理
 
   // Step 3: 接收 kXR_protocol 响应
@@ -862,6 +862,7 @@ kXR_wantTLS = 0x04  — 请求切换到 TLS
   |                                           |
   |  3. ServerResponseHeader (8B)             |
   |     + ServerInitHandShake (12B)           |
+  |     (dlen/msglen 字段共享，总计 16B)        |
   |<─────────────────────────────────────────|
   |                                           |
   |  4. kXR_ok + Protocol Response            |

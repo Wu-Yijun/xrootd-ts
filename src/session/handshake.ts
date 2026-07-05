@@ -15,7 +15,8 @@ import {
   parseRedirectResponse,
   parseErrorResponse,
 } from '../protocol/message.ts'
-import type { Frame } from '../transport/framer.ts'
+import { Framer, type Frame } from '../transport/framer.ts'
+import type { ITransport } from '../transport/interface.ts'
 
 export interface Session {
   sessid: Uint8Array
@@ -27,7 +28,8 @@ export interface Session {
 /**
  * Perform XRootD connection handshake:
  * 1. Send ClientInitHandShake(20B) + kXR_protocol(24B) merged = 44 bytes
- * 2. Receive ServerResponseHeader(8B) + ServerInitHandShake(12B) = 20 bytes
+ * 2. Receive handshake response frame (16B: ServerResponseHeader 8B with
+ *    dlen/msglen shared with ServerInitHandShake)
  * 3. Receive kXR_ok + Protocol Response
  * 4. Send kXR_login request
  * 5. Receive kXR_ok + Login Response (sessid[16] + optional secToken)
@@ -50,9 +52,14 @@ export async function handshake(
   const transport = (mux as unknown as { transport: ITransport }).transport
   await transport.send(handshakeBuf)
 
-  const _serverInit = await readExact(transport, 8 + 12)
+  // Use a single Framer for all handshake reads (handshake response + protocol response)
+  const framer = new Framer()
 
-  const protoFrame = await waitForFrame(mux)
+  const handshakeFrame = await waitForFrame(transport, framer)
+  // handshakeFrame contains: streamId=0, status=0, dlen=8, body=8B (protover + msgval)
+  // We don't need to parse it further; just consume it.
+
+  const protoFrame = await waitForFrame(transport, framer)
 
   if (protoFrame.status === ResponseStatus.Error) {
     const err = parseErrorResponse(protoFrame.body)
@@ -68,7 +75,7 @@ export async function handshake(
   const loginBuf = buildLoginRequest(0, pid, username)
   await transport.send(loginBuf)
 
-  const loginFrame = await waitForFrame(mux)
+  const loginFrame = await waitForFrame(transport, framer)
 
   if (loginFrame.status === ResponseStatus.Error) {
     const err = parseErrorResponse(loginFrame.body)
@@ -94,43 +101,21 @@ export async function handshake(
   }
 }
 
-interface ITransport {
-  send(data: Buffer): Promise<void>
-  onData(callback: (chunk: Buffer) => void): void
-}
-
-function readExact(transport: ITransport, nbytes: number): Promise<Buffer> {
-  return new Promise<Buffer>((resolve) => {
-    const chunks: Buffer[] = []
-    let received = 0
-
-    const handler = (chunk: Buffer) => {
-      chunks.push(chunk)
-      received += chunk.length
-      if (received >= nbytes) {
-        transport.onData(() => {})
-        resolve(Buffer.concat(chunks).subarray(0, nbytes))
-      }
-    }
-
-    transport.onData(handler)
-  })
-}
-
-import { Framer } from '../transport/framer.ts'
-
-function waitForFrame(mux: Multiplexer): Promise<Frame> {
-  const framer = new Framer()
-
+/**
+ * Wait for the next complete frame from the transport using the provided Framer.
+ * This function registers an onData handler and resolves when a complete frame
+ * is parsed. The handler is removed after the first frame is received.
+ */
+function waitForFrame(transport: ITransport, framer: Framer): Promise<Frame> {
   return new Promise<Frame>((resolve) => {
-    const transport = (mux as unknown as { transport: ITransport }).transport
-
-    transport.onData((chunk: Buffer) => {
+    const handler = (chunk: Buffer) => {
       const frames = framer.feed(chunk)
       for (const frame of frames) {
+        transport.removeDataHandler(handler)
         resolve(frame)
         return
       }
-    })
+    }
+    transport.onData(handler)
   })
 }

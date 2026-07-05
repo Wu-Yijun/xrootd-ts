@@ -128,7 +128,7 @@ interface ClientInitHandShake {
   fifth: number;    // 4 bytes, = htonl(2012)
 }
 
-// ServerInitHandShake: 12 字节
+// ServerInitHandShake: 12 字节 (msglen 与 ServerResponseHeader.dlen 共享同一字段)
 interface ServerInitHandShake {
   msglen: number;    // 4 bytes — 服务器版本字符串长度
   protover: number;  // 4 bytes — 协议版本号 (network byte order)
@@ -158,7 +158,7 @@ HandShakeMain (主流, subStreamId=0):
   Disconnected → HandShakeSent
     动作: 发送初始握手(20B) + kXR_protocol 合并为 44 字节
   HandShakeSent → HandShakeReceived
-    动作: 接收 ServerResponseHeader(8B) + ServerInitHandShake(12B)
+    动作: 接收握手响应帧(16B: ServerResponseHeader 8B 与 ServerInitHandShake 12B 共享 dlen/msglen 字段)
   HandShakeReceived → LoginSent
     动作: 处理 kXR_protocol 响应 → 发送 kXR_login
     注: 若需要 TLS，重新发送 kXR_protocol (带 kXR_wantTLS 标志)
@@ -1119,6 +1119,7 @@ struct ServerResponseBody_Status {
   |                                           |
   |  3. ServerResponseHeader (8B)             |
   |     + ServerInitHandShake (12B)           |
+  |     (dlen/msglen 字段共享，总计 16B)        |
   |     protover + msgval(1=DataServer)       |
   |<─────────────────────────────────────────|
   |                                           |

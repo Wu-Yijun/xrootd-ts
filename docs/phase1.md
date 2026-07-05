@@ -758,6 +758,7 @@ export class Multiplexer {
   |                                           |
   |  3. ServerResponseHeader (8B)             |
   |     + ServerInitHandShake (12B)           |
+  |     (dlen/msglen 字段共享，总计 16B)        |
   |     protover + msgval(1=DataServer)       |
   |<─────────────────────────────────────────|
   |                                           |
@@ -809,7 +810,7 @@ export async function handshake(
 
 **步骤**：
 1. 发送 `buildHandshakeAndProtocol(streamId=0, flags=kXR_secreqs|kXR_bifreqs, expect=kXR_ExpLogin)`
-2. 接收服务器握手响应（20 字节：ServerResponseHeader 8B + ServerInitHandShake 12B）
+2. 接收服务器握手响应帧（16 字节：ServerResponseHeader.dlen 与 ServerInitHandShake.msglen 共享同一字段）
 3. 接收 kXR_protocol 响应，解析 `pval, flags, secReqs, bifReqs`
 4. 发送 `buildLoginRequest(streamId, pid, username)`
 5. 接收 kXR_login 响应，提取 `sessid[16]`

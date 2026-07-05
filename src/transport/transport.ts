@@ -6,6 +6,8 @@ export class Transport implements ITransport {
   private socket: net.Socket | tls.TLSSocket | null = null
   private closeCallback: (() => void) | null = null
   private errorCallback: ((err: Error) => void) | null = null
+  private dataHandlers: ((chunk: Buffer) => void)[] = []
+  private dataListenerInstalled = false
 
   async connect(host: string, port: number, useTls = false): Promise<void> {
     this.socket = useTls
@@ -19,6 +21,13 @@ export class Transport implements ITransport {
     this.socket.on('error', (err: Error) => {
       this.errorCallback?.(err)
     })
+
+    this.socket.on('data', (chunk: Buffer) => {
+      for (const handler of this.dataHandlers) {
+        handler(chunk)
+      }
+    })
+    this.dataListenerInstalled = true
   }
 
   send(data: Buffer): Promise<void> {
@@ -28,7 +37,14 @@ export class Transport implements ITransport {
   }
 
   onData(callback: (chunk: Buffer) => void): void {
-    this.socket!.on('data', callback)
+    this.dataHandlers.push(callback)
+  }
+
+  removeDataHandler(callback: (chunk: Buffer) => void): void {
+    const idx = this.dataHandlers.indexOf(callback)
+    if (idx >= 0) {
+      this.dataHandlers.splice(idx, 1)
+    }
   }
 
   onClose(callback: () => void): void {
