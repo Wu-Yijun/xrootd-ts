@@ -14,13 +14,13 @@ import {
 import { parseErrorResponse } from "../protocol/message.ts";
 import { XRootDError } from "../api/errors.ts";
 
-const authProtocols = new Map<string, () => SecurityProtocol>();
+const authProtocolRegistry = new Map<string, () => SecurityProtocol>();
 
 export function registerAuthProtocol(
   name: string,
   factory: () => SecurityProtocol,
 ): void {
-  authProtocols.set(name, factory);
+  authProtocolRegistry.set(name, factory);
 }
 
 export async function doAuthentication(
@@ -39,7 +39,7 @@ export async function doAuthentication(
     : authProtocols;
 
   for (const protoName of candidates) {
-    const factory = authProtocols.get(protoName);
+    const factory = authProtocolRegistry.get(protoName);
     if (!factory) continue;
 
     const protocol = factory();
