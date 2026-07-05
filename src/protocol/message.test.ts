@@ -13,6 +13,7 @@ import {
   parseOpenResponse,
   parseProtocolResponse,
   parseRedirectResponse,
+  parseSecToken,
   parseWaitResponse,
 } from "./message.ts";
 
@@ -222,18 +223,72 @@ describe("parseProtocolResponse", () => {
     const resp = parseProtocolResponse(body);
     assert.equal(resp.pval, 0x520);
     assert.equal(resp.flags, 0x03);
-    assert.equal(resp.secReqs, undefined);
+    assert.equal(resp.seclvl, undefined);
     assert.equal(resp.bifReqs, undefined);
   });
 
-  it("parses secReqs and bifReqs when present", () => {
-    const body = Buffer.alloc(16);
+  it("parses secReqs binary struct (tag 'S')", () => {
+    const body = Buffer.alloc(8 + 6); // pval + flags + secReqs struct (6 bytes)
     body.writeUInt32BE(0x520, 0);
     body.writeUInt32BE(0x09, 4);
-    Buffer.from("krb5").copy(body, 8);
+    body[8] = 0x53; // tag 'S'
+    body[9] = 0; // rsvd
+    body[10] = 0; // secver
+    body[11] = 1; // secopt
+    body[12] = 2; // seclvl (standard)
+    body[13] = 0; // secvsz (no secvec entries)
     const resp = parseProtocolResponse(body);
     assert.equal(resp.pval, 0x520);
-    assert.equal(resp.secReqs, "krb5");
+    assert.equal(resp.seclvl, 2);
+    assert.equal(resp.secopt, 1);
+  });
+
+  it("parses secReqs struct with secvec entries", () => {
+    const body = Buffer.alloc(8 + 6 + 4); // secReqs + 2 secvec entries (2 bytes each)
+    body.writeUInt32BE(0x520, 0);
+    body.writeUInt32BE(0x09, 4);
+    body[8] = 0x53; // tag 'S'
+    body[9] = 0;
+    body[10] = 0;
+    body[11] = 0;
+    body[12] = 3; // seclvl (intense)
+    body[13] = 2; // secvsz = 2 entries
+    body[14] = 0; body[15] = 1; // secvec[0]
+    body[16] = 1; body[17] = 2; // secvec[1]
+    const resp = parseProtocolResponse(body);
+    assert.equal(resp.seclvl, 3);
+  });
+
+  it("parses bifReqs binary struct (tag 'B')", () => {
+    const bifInfo = "krb5,host";
+    const body = Buffer.alloc(8 + 4 + bifInfo.length);
+    body.writeUInt32BE(0x520, 0);
+    body.writeUInt32BE(0x09, 4);
+    body[8] = 0x42; // tag 'B'
+    body[9] = 0; // rsvd
+    body.writeUInt16BE(bifInfo.length, 10); // bifILen
+    Buffer.from(bifInfo).copy(body, 12);
+    const resp = parseProtocolResponse(body);
+    assert.equal(resp.bifReqs, "krb5,host");
+  });
+
+  it("parses both bifReqs and secReqs structs", () => {
+    const bifInfo = "host";
+    const body = Buffer.alloc(8 + 4 + bifInfo.length + 6);
+    body.writeUInt32BE(0x520, 0);
+    body.writeUInt32BE(0x09, 4);
+    // bifReqs first
+    body[8] = 0x42;
+    body[9] = 0;
+    body.writeUInt16BE(bifInfo.length, 10);
+    Buffer.from(bifInfo).copy(body, 12);
+    const secOff = 12 + bifInfo.length;
+    body[secOff] = 0x53;
+    body[secOff + 4] = 1; // seclvl
+    body[secOff + 5] = 0; // secvsz
+    const resp = parseProtocolResponse(body);
+    assert.equal(resp.bifReqs, "host");
+    assert.equal(resp.seclvl, 1);
   });
 });
 
@@ -274,6 +329,28 @@ describe("parseLoginResponse", () => {
     const resp = parseLoginResponse(body);
     assert.equal(resp.needsAuth, true);
     assert.deepEqual([...resp.secToken!], [0xaa, 0xbb, 0xcc, 0xdd]);
+  });
+});
+
+describe("parseSecToken", () => {
+  it("parses single protocol", () => {
+    const token = new TextEncoder().encode("&P=host");
+    assert.deepEqual(parseSecToken(token), ["host"]);
+  });
+
+  it("parses multiple protocols", () => {
+    const token = new TextEncoder().encode("&P=host&P=sss&P=gsi");
+    assert.deepEqual(parseSecToken(token), ["host", "sss", "gsi"]);
+  });
+
+  it("parses protocols with args (strips args)", () => {
+    const token = new TextEncoder().encode("&P=gsi,v:42,c:ssl&P=host");
+    assert.deepEqual(parseSecToken(token), ["gsi", "host"]);
+  });
+
+  it("returns empty array for empty token", () => {
+    const token = new Uint8Array(0);
+    assert.deepEqual(parseSecToken(token), []);
   });
 });
 

@@ -73,17 +73,17 @@ function createAuthServer(
             const initBody = Buffer.alloc(8);
             socket.write(buildResponseFrame(0, 0, initBody));
 
-            // Then the protocol response
-            const secReqsBuf = Buffer.from(secReqs + "\0");
-            const body = Buffer.alloc(8 + secReqsBuf.length);
+            // Then the protocol response (pval + flags only, no secReqs struct needed)
+            const body = Buffer.alloc(8);
             body.writeUInt32BE(0x520, 0);
             body.writeUInt32BE(0x09, 4);
-            secReqsBuf.copy(body, 8);
             socket.write(buildResponseFrame(streamId, 0, body));
           } else if (requestId === 3007) {
-            // kXR_login
-            const body = Buffer.alloc(16);
+            // kXR_login - send sessid[16] + secToken
+            const secToken = Buffer.from(secReqs + "\0");
+            const body = Buffer.alloc(16 + secToken.length);
             for (let i = 0; i < 16; i++) body[i] = i + 1;
+            secToken.copy(body, 16);
             socket.write(buildResponseFrame(streamId, 0, body));
           } else if (requestId === 3000) {
             // kXR_auth - credType is in body bytes 12-15, credData is extra data
@@ -146,6 +146,8 @@ describe("E2E: host authentication", () => {
       assert.ok(session, "session should be defined");
       assert.ok(session.sessid, "sessid should be defined");
       assert.equal(session.sessid.length, 16);
+      assert.equal(session.needsAuth, true);
+      assert.deepEqual(session.authProtocols, ["host"]);
 
       mux.close();
       await transport.close();
@@ -154,7 +156,7 @@ describe("E2E: host authentication", () => {
     }
   });
 
-  it("auth failure throws error", async () => {
+  it("auth failure sets needsAuth but does not throw", async () => {
     const { server, port } = await createAuthServer("host", () => {
       return { ok: false, msg: "Host not trusted" };
     });
@@ -167,13 +169,9 @@ describe("E2E: host authentication", () => {
       const mux = new Multiplexer(transport);
       const url = new XRootDUrl(`root://127.0.0.1:${port}/`);
 
-      try {
-        await handshake(mux, url);
-        assert.fail("Expected auth error");
-      } catch (err) {
-        assert.ok(err instanceof Error);
-        assert.match(err.message, /auth/i);
-      }
+      const session = await handshake(mux, url);
+      assert.equal(session.needsAuth, true);
+      assert.deepEqual(session.authProtocols, ["host"]);
 
       mux.close();
       await transport.close();
@@ -184,7 +182,7 @@ describe("E2E: host authentication", () => {
 });
 
 describe("E2E: unsupported auth protocol", () => {
-  it("throws when no supported auth protocol", async () => {
+  it("returns session with authProtocols when no supported protocol", async () => {
     const { server, port } = await createAuthServer("krb5");
 
     try {
@@ -193,12 +191,9 @@ describe("E2E: unsupported auth protocol", () => {
       const mux = new Multiplexer(transport);
       const url = new XRootDUrl(`root://127.0.0.1:${port}/`);
 
-      try {
-        await handshake(mux, url);
-        assert.fail("Expected auth error");
-      } catch (err) {
-        assert.ok(err instanceof Error);
-      }
+      const session = await handshake(mux, url);
+      assert.equal(session.needsAuth, true);
+      assert.deepEqual(session.authProtocols, ["krb5"]);
 
       mux.close();
       await transport.close();

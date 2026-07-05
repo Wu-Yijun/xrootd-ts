@@ -71,7 +71,14 @@ function makeProtocolResponseFrame(): Buffer {
   return buildResponseFrame(0, 0, body);
 }
 
-function makeLoginResponseFrame(): Buffer {
+function makeLoginResponseFrame(secToken?: string): Buffer {
+  if (secToken) {
+    const tokenBytes = Buffer.from(secToken, "utf8");
+    const body = Buffer.alloc(16 + tokenBytes.length);
+    for (let i = 0; i < 16; i++) body[i] = i + 1;
+    tokenBytes.copy(body, 16);
+    return buildResponseFrame(0, 0, body);
+  }
   const body = Buffer.alloc(16);
   for (let i = 0; i < 16; i++) body[i] = i + 1;
   return buildResponseFrame(0, 0, body);
@@ -127,6 +134,8 @@ describe("handshake", () => {
     const session = await sessionPromise;
 
     assert.equal(session.protocolVersion, 0x520);
+    assert.equal(session.needsAuth, false);
+    assert.equal(session.authProtocols, undefined);
     assert.deepEqual([...session.sessid], [
       1,
       2,
@@ -215,6 +224,31 @@ describe("handshake", () => {
     assert.equal(loginSend.readUInt32BE(4), 42); // pid
     const username = loginSend.toString("utf8", 8, 16).replace(/\0+$/, "");
     assert.equal(username, "alice");
+
+    mux.close();
+  });
+
+  it("returns authProtocols from login secToken", async () => {
+    const transport = new MockTransportForHandshake();
+    const mux = new Multiplexer(transport as any);
+    const url = new XRootDUrl("root://host.cern.ch/data");
+
+    const sessionPromise = handshake(mux, url);
+
+    await new Promise((r) => setTimeout(r, 10));
+    transport.emit(makeServerInitFrame());
+
+    await new Promise((r) => setTimeout(r, 10));
+    transport.emit(makeProtocolResponseFrame());
+
+    await new Promise((r) => setTimeout(r, 10));
+    // Login response with secToken
+    transport.emit(makeLoginResponseFrame("&P=host&P=sss"));
+
+    const session = await sessionPromise;
+
+    assert.equal(session.needsAuth, true);
+    assert.deepEqual(session.authProtocols, ["host", "sss"]);
 
     mux.close();
   });

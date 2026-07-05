@@ -120,7 +120,7 @@ describe("Auth Framework", () => {
       sessid: new Uint8Array(16),
     };
 
-    const entity = await doAuthentication(mux, "", params);
+    const entity = await doAuthentication(mux, [], params);
     assert.equal(entity.prot, "");
   });
 
@@ -137,7 +137,7 @@ describe("Auth Framework", () => {
       sessid: new Uint8Array(16),
     };
 
-    const responsePromise = doAuthentication(mux, "host", params);
+    const responsePromise = doAuthentication(mux, ["host"], params);
 
     await sleep(1);
     transport.simulateResponse(0, Buffer.alloc(0));
@@ -156,7 +156,7 @@ describe("Auth Framework", () => {
     };
 
     await assert.rejects(
-      () => doAuthentication(mux, "unsupported", params),
+      () => doAuthentication(mux, ["unsupported"], params),
       (err: any) => err.code === 3030,
     );
   });
@@ -194,7 +194,7 @@ describe("Auth Framework", () => {
       sessid: new Uint8Array(16),
     };
 
-    const responsePromise = doAuthentication(mux, "sss", params);
+    const responsePromise = doAuthentication(mux, ["sss"], params);
 
     await sleep(1);
     // First authmore
@@ -223,7 +223,7 @@ describe("Auth Framework", () => {
       sessid: new Uint8Array(16),
     };
 
-    const responsePromise = doAuthentication(mux, "host", params);
+    const responsePromise = doAuthentication(mux, ["host"], params);
 
     await sleep(1);
     // Send error response
