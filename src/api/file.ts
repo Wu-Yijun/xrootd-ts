@@ -107,7 +107,7 @@ export class File {
     }
 
     if (frame.status === ResponseStatus.Ok) {
-      return frame.dlen;
+      return frame.dlen > 0 ? frame.dlen : data.length;
     }
 
     throw new XRootDError(
