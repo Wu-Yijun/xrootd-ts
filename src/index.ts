@@ -35,6 +35,7 @@ export { XRootDUrl } from "./url/url.ts";
 
 // Protocol
 export * from "./protocol/constants.ts";
+export { Message } from "./protocol/message-class.ts";
 export {
   buildCloseRequest,
   buildHandshakeAndProtocol,
