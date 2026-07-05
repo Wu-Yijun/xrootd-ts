@@ -5,7 +5,7 @@ export type { XRootDClientOptions } from "./client.ts";
 // API layer
 export { File } from "./api/file.ts";
 export type { StatInfo } from "./api/types.ts";
-export { createStatInfo } from "./api/types.ts";
+export { createStatInfo, StatFlags } from "./api/types.ts";
 export { FileSystem } from "./api/filesystem.ts";
 export { XRootDError } from "./api/errors.ts";
 export type {
