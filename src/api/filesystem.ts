@@ -37,6 +37,12 @@ function extractBody(buf: Buffer): Uint8Array {
   return new Uint8Array(buf.subarray(4, 20))
 }
 
+function extractExtraData(buf: Buffer): Uint8Array | undefined {
+  const dlen = buf.readUInt32BE(20)
+  if (dlen === 0) return undefined
+  return new Uint8Array(buf.subarray(24, 24 + dlen))
+}
+
 export class FileSystem {
   private mux: Multiplexer
 
@@ -46,14 +52,14 @@ export class FileSystem {
 
   async stat(path: string): Promise<StatInfo> {
     const req = buildStatRequest(0, path)
-    const frame = await this.mux.request(RequestId.Stat, extractBody(req))
+    const frame = await this.mux.request(RequestId.Stat, extractBody(req), extractExtraData(req))
     this.handleError(frame)
     return createStatInfo(frame.body.toString('utf8'))
   }
 
   async readdir(path: string): Promise<DirectoryList> {
     const req = buildDirlistRequest(0, path)
-    const frame = await this.mux.request(RequestId.Dirlist, extractBody(req))
+    const frame = await this.mux.request(RequestId.Dirlist, extractBody(req), extractExtraData(req))
     this.handleError(frame)
 
     const { entries } = parseDirlistResponse(frame.body)
@@ -62,25 +68,25 @@ export class FileSystem {
 
   async mkdir(path: string, mode: number = 0o755): Promise<void> {
     const req = buildMkdirRequest(0, path, mode)
-    const frame = await this.mux.request(RequestId.Mkdir, extractBody(req))
+    const frame = await this.mux.request(RequestId.Mkdir, extractBody(req), extractExtraData(req))
     this.handleError(frame)
   }
 
   async rmdir(path: string): Promise<void> {
     const req = buildRmdirRequest(0, path)
-    const frame = await this.mux.request(RequestId.Rmdir, extractBody(req))
+    const frame = await this.mux.request(RequestId.Rmdir, extractBody(req), extractExtraData(req))
     this.handleError(frame)
   }
 
   async rm(path: string): Promise<void> {
     const req = buildRmRequest(0, path)
-    const frame = await this.mux.request(RequestId.Rm, extractBody(req))
+    const frame = await this.mux.request(RequestId.Rm, extractBody(req), extractExtraData(req))
     this.handleError(frame)
   }
 
   async mv(source: string, target: string): Promise<void> {
     const req = buildMvRequest(0, source, target)
-    const frame = await this.mux.request(RequestId.Mv, extractBody(req))
+    const frame = await this.mux.request(RequestId.Mv, extractBody(req), extractExtraData(req))
     this.handleError(frame)
   }
 

@@ -171,10 +171,10 @@ function createFileSystemServer(): Promise<{ server: net.Server; port: number }>
               socket.write(buildResponseFrame(streamId, 4003, errBody))
             }
           } else if (requestId === 3009) {
-            // kXR_mv
-            const arg1len = reqBody.readUInt16BE(0)
-            const source = reqBody.subarray(2, 2 + arg1len).toString('utf8').replace(/\0+$/, '')
-            const target = reqBody.subarray(2 + arg1len).toString('utf8').replace(/\0+$/, '')
+            // kXR_mv - arg1len is in the body at bytes 18-19, extra data is source+target
+            const arg1len = message.readUInt16BE(18)
+            const source = reqBody.subarray(0, arg1len).toString('utf8').replace(/\0+$/, '')
+            const target = reqBody.subarray(arg1len).toString('utf8').replace(/\0+$/, '')
 
             const srcParent = source.substring(0, source.lastIndexOf('/')) || '/'
             const srcName = source.substring(source.lastIndexOf('/') + 1)
