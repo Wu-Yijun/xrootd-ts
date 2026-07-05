@@ -133,10 +133,10 @@ describe("Integration: file read flow", () => {
 
       const info = await file.stat();
       assert.ok(info, "stat info should be defined");
-      assert.ok(info.size > 0, "file size should be > 0");
+      assert.ok(info.size > 0n, "file size should be > 0");
       assert.equal(
         info.size,
-        Buffer.byteLength(EXPECTED_FILE_CONTENTS),
+        BigInt(Buffer.byteLength(EXPECTED_FILE_CONTENTS)),
         "size should match content length",
       );
 
@@ -202,7 +202,7 @@ describe("Integration: XRootDClient file operations", () => {
       await withTimeout(client.connect(), 5000, "client.connect()");
 
       const info = await client.stat(TEST_FILE_PATH);
-      assert.ok(info.size > 0, "file size should be > 0");
+      assert.ok(info.size > 0n, "file size should be > 0");
     } finally {
       await client.close();
     }

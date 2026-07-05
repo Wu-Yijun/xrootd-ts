@@ -62,7 +62,7 @@ describe("Integration: FileSystem.stat", () => {
     try {
       const info = await fs.stat(TEST_FILE_PATH);
       assert.ok(info, "stat info should be defined");
-      assert.ok(info.size > 0, "file size should be > 0");
+      assert.ok(info.size > 0n, "file size should be > 0");
       assert.equal(info.isDirectory, false, "should not be a directory");
     } finally {
       await close();
@@ -74,8 +74,8 @@ describe("Integration: FileSystem.stat", () => {
     try {
       const info = await fs.stat("/data/test");
       assert.ok(info, "stat info should be defined");
-      assert.ok(typeof info.id === "number", "should have a numeric id");
-      assert.ok(info.size >= 0, "size should be >= 0");
+      assert.ok(typeof info.id === "string", "should have a string id");
+      assert.ok(info.size >= 0n, "size should be >= 0");
       assert.ok(info.mtime > 0, "mtime should be > 0");
     } finally {
       await close();
@@ -140,7 +140,7 @@ describe("Integration: XRootDClient filesystem operations", () => {
     try {
       await withTimeout(client.connect(), 5000, "client.connect()");
       const info = await client.statFilesystem(TEST_FILE_PATH);
-      assert.ok(info.size > 0, "file size should be > 0");
+      assert.ok(info.size > 0n, "file size should be > 0");
       assert.ok(info.mtime > 0, "mtime should be > 0");
     } finally {
       await client.close();
