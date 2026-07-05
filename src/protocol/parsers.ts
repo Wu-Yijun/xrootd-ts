@@ -24,6 +24,8 @@ export interface LoginResponse {
 /** Open response from kXR_open. */
 export interface OpenResponse {
   fhandle: Uint8Array;
+  cpsize: number;
+  cptype: string;
 }
 
 /** Error response from kXR_error. */
@@ -109,7 +111,10 @@ export function parseLoginResponse(body: Buffer): LoginResponse {
  */
 export function parseOpenResponse(body: Buffer): OpenResponse {
   const [fhandle] = getBytes(body, 0, 4);
-  return { fhandle: new Uint8Array(fhandle) };
+  const [cpsize] = get32(body, 4);
+  const [cptypeRaw] = getBytes(body, 8, 4);
+  const cptype = Buffer.from(cptypeRaw).toString("utf8").replace(/\0+$/, "");
+  return { fhandle: new Uint8Array(fhandle), cpsize, cptype };
 }
 
 /**

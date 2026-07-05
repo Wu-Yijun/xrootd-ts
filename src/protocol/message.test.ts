@@ -278,10 +278,23 @@ describe("parseLoginResponse", () => {
 });
 
 describe("parseOpenResponse", () => {
-  it("parses fhandle[4]", () => {
-    const body = Buffer.from([0xde, 0xad, 0xbe, 0xef]);
+  it("parses fhandle[4] + cpsize[4] + cptype[4]", () => {
+    const body = Buffer.alloc(12);
+    body.set([0xde, 0xad, 0xbe, 0xef], 0); // fhandle
+    body.writeInt32BE(65536, 4); // cpsize
+    Buffer.from("zlib").copy(body, 8); // cptype
     const resp = parseOpenResponse(body);
     assert.deepEqual([...resp.fhandle], [0xde, 0xad, 0xbe, 0xef]);
+    assert.equal(resp.cpsize, 65536);
+    assert.equal(resp.cptype, "zlib");
+  });
+
+  it("parses minimal response with zero cpsize and empty cptype", () => {
+    const body = Buffer.from([0x01, 0x02, 0x03, 0x04]);
+    const resp = parseOpenResponse(body);
+    assert.deepEqual([...resp.fhandle], [0x01, 0x02, 0x03, 0x04]);
+    assert.equal(resp.cpsize, 0);
+    assert.equal(resp.cptype, "");
   });
 });
 

@@ -68,6 +68,12 @@ const testSession: Session = {
   protocolVersion: 0x520,
 };
 
+function buildOpenBody(fhandle: Buffer): Buffer {
+  const body = Buffer.alloc(12);
+  fhandle.copy(body, 0);
+  return body;
+}
+
 describe("File", () => {
   it("open() sends correct request and stores fhandle", async () => {
     const transport = new MockTransportForFile();
@@ -75,7 +81,7 @@ describe("File", () => {
     const file = new File(mux, testSession);
 
     const fhandle = Buffer.from([0xaa, 0xbb, 0xcc, 0xdd]);
-    transport.enqueueResponse(0, fhandle);
+    transport.enqueueResponse(0, buildOpenBody(fhandle));
 
     await file.open("/data/test.txt", { flags: 0x0010 });
     assert.equal(file.isOpen, true);
@@ -92,7 +98,7 @@ describe("File", () => {
     const file = new File(mux, testSession);
 
     const fhandle = Buffer.from([0x01, 0x02, 0x03, 0x04]);
-    transport.enqueueResponse(0, fhandle);
+    transport.enqueueResponse(0, buildOpenBody(fhandle));
     await file.open("/test", { flags: 0x0010 });
 
     const fileData = Buffer.from([0xde, 0xad, 0xbe, 0xef]);
@@ -115,7 +121,7 @@ describe("File", () => {
     const file = new File(mux, testSession);
 
     const fhandle = Buffer.from([0x11, 0x22, 0x33, 0x44]);
-    transport.enqueueResponse(0, fhandle);
+    transport.enqueueResponse(0, buildOpenBody(fhandle));
     await file.open("/test", { flags: 0x0020 });
 
     const writeData = new Uint8Array([1, 2, 3, 4, 5]);
@@ -138,7 +144,7 @@ describe("File", () => {
     const file = new File(mux, testSession);
 
     const fhandle = Buffer.from([0xaa, 0xbb, 0xcc, 0xdd]);
-    transport.enqueueResponse(0, fhandle);
+    transport.enqueueResponse(0, buildOpenBody(fhandle));
     await file.open("/test", { flags: 0x0010 });
     assert.equal(file.isOpen, true);
 
@@ -173,7 +179,7 @@ describe("File", () => {
     const file = new File(mux, testSession);
 
     const fhandle = Buffer.from([0x01, 0x02, 0x03, 0x04]);
-    transport.enqueueResponse(0, fhandle);
+    transport.enqueueResponse(0, buildOpenBody(fhandle));
     await file.open("/test", { flags: 0x0010 });
 
     await assert.rejects(
@@ -212,7 +218,7 @@ describe("File", () => {
     const file = new File(mux, testSession);
 
     const fhandle = Buffer.from([0xaa, 0xbb, 0xcc, 0xdd]);
-    transport.enqueueResponse(0, fhandle);
+    transport.enqueueResponse(0, buildOpenBody(fhandle));
     await file.open("/test", { flags: 0x0020 });
 
     transport.enqueueResponse(0, Buffer.alloc(0));
@@ -245,7 +251,7 @@ describe("File", () => {
     const file = new File(mux, testSession);
 
     const fhandle = Buffer.from([0xaa, 0xbb, 0xcc, 0xdd]);
-    transport.enqueueResponse(0, fhandle);
+    transport.enqueueResponse(0, buildOpenBody(fhandle));
     await file.open("/test", { flags: 0x0020 });
 
     transport.enqueueResponse(0, Buffer.alloc(0));
