@@ -69,7 +69,7 @@ describe("Integration: StatInfo type validation", () => {
   it("stat on directory sets isDirectory = true", async () => {
     const client = await createConnectedClient();
     try {
-      const info = await client.stat("/data/test");
+      const info = await client.statFilesystem("/data/test");
       assert.equal(info.isDirectory, true, "should be a directory");
     } finally {
       await client.close();
