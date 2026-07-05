@@ -18,12 +18,14 @@ import {
 } from "../protocol/message.ts";
 import { createFrameReader } from "../utils/frame-reader.ts";
 import { XRootDError } from "../api/errors.ts";
+import type { SecEntity } from "../security/interface.ts";
 
 export interface Session {
   sessid: Uint8Array;
   protocolVersion: number;
   secReqs?: string;
   bifReqs?: string;
+  secEntity?: SecEntity;
 }
 
 /**
