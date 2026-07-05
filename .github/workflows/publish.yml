@@ -54,4 +54,4 @@ jobs:
 
       - name: Publish package
         if: ${{ github.event_name == 'release' && github.event.action == 'published' || github.event_name == 'workflow_dispatch' && github.event.inputs.publish == 'true' }}
-        run: npm publish --provenance --access public
+        run: npm publish --tag next --provenance --access public
