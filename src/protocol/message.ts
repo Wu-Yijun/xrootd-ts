@@ -466,3 +466,322 @@ export function parseWaitResponse(body: Buffer): WaitResponse {
   const [infomsg] = getString(body, off, body.length - off);
   return { seconds, infomsg };
 }
+
+// ── Phase 2 Request Builders ───────────────────────────────────────────────
+
+/**
+ * kXR_sync request (24 B header, no extra data).
+ *
+ * Body layout (16 B):
+ *   fhandle[4] + reserved[12]
+ */
+export function buildSyncRequest(
+  streamId: number,
+  fhandle: Uint8Array,
+): Buffer {
+  const msg = new Message(REQUEST_HDR_SIZE);
+
+  // header
+  msg.writeBytes(streamIdToBytes(streamId));
+  msg.writeInt16BE(3016); // RequestId.Sync
+
+  // body
+  msg.writeBytes(fhandle);
+  msg.writeBytes(new Uint8Array(12)); // reserved
+
+  // dlen
+  msg.writeInt32BE(0);
+
+  return msg.getBuffer();
+}
+
+/**
+ * kXR_truncate request (24 B header + 8 B size).
+ *
+ * Body layout (16 B):
+ *   fhandle[4] + reserved[12]
+ * Extra data:
+ *   size[8] (int64 BE)
+ */
+export function buildTruncateRequest(
+  streamId: number,
+  fhandle: Uint8Array,
+  size: number,
+): Buffer {
+  const msg = new Message(REQUEST_HDR_SIZE + 8);
+
+  // header
+  msg.writeBytes(streamIdToBytes(streamId));
+  msg.writeInt16BE(3028); // RequestId.Truncate
+
+  // body
+  msg.writeBytes(fhandle);
+  msg.writeBytes(new Uint8Array(12)); // reserved
+
+  // dlen
+  msg.writeInt32BE(8);
+
+  // size as int64 BE
+  msg.writeInt32BE(Math.floor(size / 0x100000000));
+  msg.writeInt32BE(size >>> 0);
+
+  return msg.getBuffer();
+}
+
+/**
+ * kXR_dirlist request (24 B header + path string).
+ *
+ * Body layout (16 B):
+ *   reserved[15] + options[1]
+ */
+export function buildDirlistRequest(
+  streamId: number,
+  path: string,
+  options: number = 0,
+): Buffer {
+  const pathBytes = strToBytes(path);
+  const msg = new Message(REQUEST_HDR_SIZE + pathBytes.length);
+
+  // header
+  msg.writeBytes(streamIdToBytes(streamId));
+  msg.writeInt16BE(3004); // RequestId.Dirlist
+
+  // body
+  msg.writeBytes(new Uint8Array(15)); // reserved
+  msg.writeUInt8(options & 0xff);
+
+  // dlen
+  msg.writeInt32BE(pathBytes.length);
+
+  // path
+  msg.writeBytes(pathBytes);
+
+  return msg.getBuffer();
+}
+
+/**
+ * kXR_mkdir request (24 B header + path string).
+ *
+ * Body layout (16 B):
+ *   mode[2] + reserved[14]
+ */
+export function buildMkdirRequest(
+  streamId: number,
+  path: string,
+  mode: number = 0o755,
+): Buffer {
+  const pathBytes = strToBytes(path);
+  const msg = new Message(REQUEST_HDR_SIZE + pathBytes.length);
+
+  // header
+  msg.writeBytes(streamIdToBytes(streamId));
+  msg.writeInt16BE(3008); // RequestId.Mkdir
+
+  // body
+  msg.writeInt16BE(mode & 0xffff);
+  msg.writeBytes(new Uint8Array(14)); // reserved
+
+  // dlen
+  msg.writeInt32BE(pathBytes.length);
+
+  // path
+  msg.writeBytes(pathBytes);
+
+  return msg.getBuffer();
+}
+
+/**
+ * kXR_rmdir request (24 B header + path string).
+ *
+ * Body layout (16 B):
+ *   reserved[16]
+ */
+export function buildRmdirRequest(
+  streamId: number,
+  path: string,
+): Buffer {
+  const pathBytes = strToBytes(path);
+  const msg = new Message(REQUEST_HDR_SIZE + pathBytes.length);
+
+  // header
+  msg.writeBytes(streamIdToBytes(streamId));
+  msg.writeInt16BE(3015); // RequestId.Rmdir
+
+  // body
+  msg.writeBytes(new Uint8Array(16)); // reserved
+
+  // dlen
+  msg.writeInt32BE(pathBytes.length);
+
+  // path
+  msg.writeBytes(pathBytes);
+
+  return msg.getBuffer();
+}
+
+/**
+ * kXR_rm request (24 B header + path string).
+ *
+ * Body layout (16 B):
+ *   reserved[16]
+ */
+export function buildRmRequest(
+  streamId: number,
+  path: string,
+): Buffer {
+  const pathBytes = strToBytes(path);
+  const msg = new Message(REQUEST_HDR_SIZE + pathBytes.length);
+
+  // header
+  msg.writeBytes(streamIdToBytes(streamId));
+  msg.writeInt16BE(3014); // RequestId.Rm
+
+  // body
+  msg.writeBytes(new Uint8Array(16)); // reserved
+
+  // dlen
+  msg.writeInt32BE(pathBytes.length);
+
+  // path
+  msg.writeBytes(pathBytes);
+
+  return msg.getBuffer();
+}
+
+/**
+ * kXR_mv request (24 B header + source + target).
+ *
+ * Body layout (16 B):
+ *   reserved[14] + arg1len[2]
+ * Extra data:
+ *   source[arg1len] + target[dlen - arg1len]
+ */
+export function buildMvRequest(
+  streamId: number,
+  source: string,
+  target: string,
+): Buffer {
+  const srcBytes = strToBytes(source);
+  const tgtBytes = strToBytes(target);
+  const msg = new Message(REQUEST_HDR_SIZE + srcBytes.length + tgtBytes.length);
+
+  // header
+  msg.writeBytes(streamIdToBytes(streamId));
+  msg.writeInt16BE(3009); // RequestId.Mv
+
+  // body
+  msg.writeBytes(new Uint8Array(14)); // reserved
+  msg.writeInt16BE(srcBytes.length & 0xffff); // arg1len
+
+  // dlen
+  msg.writeInt32BE(srcBytes.length + tgtBytes.length);
+
+  // source + target
+  msg.writeBytes(srcBytes);
+  msg.writeBytes(tgtBytes);
+
+  return msg.getBuffer();
+}
+
+/**
+ * kXR_auth request (24 B header + credential data).
+ *
+ * Body layout (16 B):
+ *   reserved[12] + credtype[4]
+ */
+export function buildAuthRequest(
+  streamId: number,
+  credType: number,
+  credData: Uint8Array,
+): Buffer {
+  const msg = new Message(REQUEST_HDR_SIZE + credData.length);
+
+  // header
+  msg.writeBytes(streamIdToBytes(streamId));
+  msg.writeInt16BE(3000); // RequestId.Auth
+
+  // body
+  msg.writeBytes(new Uint8Array(12)); // reserved
+  msg.writeInt32BE(credType);
+
+  // dlen
+  msg.writeInt32BE(credData.length);
+
+  // credential data
+  msg.writeBytes(credData);
+
+  return msg.getBuffer();
+}
+
+/**
+ * kXR_endsess request (24 B header, no extra data).
+ *
+ * Body layout (16 B):
+ *   sessid[16]
+ */
+export function buildEndsessRequest(
+  streamId: number,
+  sessid: Uint8Array,
+): Buffer {
+  const msg = new Message(REQUEST_HDR_SIZE);
+
+  // header
+  msg.writeBytes(streamIdToBytes(streamId));
+  msg.writeInt16BE(3023); // RequestId.Endsess
+
+  // body
+  msg.writeBytes(sessid);
+
+  // dlen
+  msg.writeInt32BE(0);
+
+  return msg.getBuffer();
+}
+
+// ── Phase 2 Response Parsers ───────────────────────────────────────────────
+
+export interface DirectoryEntry {
+  name: string;
+  size: number;
+  flags: number;
+  modTime: number;
+}
+
+export interface DirlistResponse {
+  entries: DirectoryEntry[];
+}
+
+/**
+ * Parse kXR_dirlist response body.
+ *
+ * Each entry format: `name\0size:flags:mtime\n`
+ * Entries are NUL-separated; last entry has no trailing NUL.
+ */
+export function parseDirlistResponse(body: Buffer): DirlistResponse {
+  const text = body.toString('utf8');
+  const entries: DirectoryEntry[] = [];
+
+  // Split by NUL or newline, filter empty
+  const parts = text.split(/\0/).filter((p) => p.trim().length > 0);
+
+  for (const part of parts) {
+    // Each part: "name:size:flags:mtime"
+    const colonIdx = part.indexOf(':');
+    if (colonIdx === -1) continue;
+
+    const name = part.substring(0, colonIdx);
+    const rest = part.substring(colonIdx + 1);
+    const fields = rest.split(':');
+
+    if (fields.length >= 3) {
+      entries.push({
+        name,
+        size: parseInt(fields[0], 10) || 0,
+        flags: parseInt(fields[1], 10) || 0,
+        modTime: parseInt(fields[2], 10) || 0,
+      });
+    }
+  }
+
+  return { entries };
+}
