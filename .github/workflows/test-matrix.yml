@@ -75,10 +75,10 @@ jobs:
             
             # 2. 切换到系统内置的非特权用户 (daemon) 来在后台启动 xrootd
             # 注意：$(pwd) 会在当前 root 的 shell 展开，以绝对路径传递给 daemon
-            su -s /bin/sh daemon -c "nohup xrootd -p 32874 '$(pwd)' > xrootd-server.log 2>&1 &"
+            su -s /bin/sh daemon -c "nohup xrootd -p 1094 '$(pwd)' > xrootd-server.log 2>&1 &"
           else
             echo "Detected non-root user (macOS environment). Running directly..."
-            nohup xrootd -p 32874 "$(pwd)" > xrootd-server.log 2>&1 &
+            nohup xrootd -p 1094 "$(pwd)" > xrootd-server.log 2>&1 &
           fi
 
           echo "Sleeping 10 seconds...."
