@@ -20,22 +20,14 @@ function createSimulatedServer(): Promise<{ server: net.Server; port: number }> 
   return new Promise((resolve) => {
     const server = net.createServer((socket) => {
       let buffer = Buffer.alloc(0)
+      let handshakeDone = false
 
-      socket.on('data', (chunk: Buffer) => {
-        buffer = Buffer.concat([buffer, chunk])
+      function processMessage(message: Buffer, socket: net.Socket) {
+        const streamId = (message[0] << 8) | message[1]
 
-        // Process all complete messages
-        while (buffer.length >= 24) {
-          const requestId = buffer.readUInt16BE(2)
-          const dlen = buffer.readUInt32BE(20)
-          const totalLen = 24 + dlen
-
-          if (buffer.length < totalLen) break
-
-          const message = buffer.subarray(0, totalLen)
-          buffer = buffer.subarray(totalLen)
-
-          const streamId = (message[0] << 8) | message[1]
+        if (message.length >= 24) {
+          const requestId = message.readUInt16BE(2)
+          const dlen = message.readUInt32BE(20)
 
           if (requestId === 3006) {
             // kXR_protocol
@@ -64,6 +56,49 @@ function createSimulatedServer(): Promise<{ server: net.Server; port: number }> 
             errBody.writeUInt32BE(3006, 0)
             socket.write(buildResponseFrame(streamId, 4003, errBody))
           }
+        }
+      }
+
+      socket.on('data', (chunk: Buffer) => {
+        buffer = Buffer.concat([buffer, chunk])
+
+        while (buffer.length >= 24) {
+          // Detect merged ClientInitHandShake(20B) + kXR_protocol(24B) = 44 bytes
+          // Handshake marker: first=0, second=0, third=0, fourth=htonl(4), fifth=htonl(2012)
+          if (!handshakeDone && buffer.length >= 44) {
+            const first = buffer.readInt32BE(0)
+            const second = buffer.readInt32BE(4)
+            const third = buffer.readInt32BE(8)
+            const fourth = buffer.readInt32BE(12)
+            const fifth = buffer.readInt32BE(16)
+
+            if (first === 0 && second === 0 && third === 0 && fourth === 4 && fifth === 2012) {
+              handshakeDone = true
+
+              // Send ServerInitHandShake response
+              const initBody = Buffer.alloc(8)
+              initBody.writeUInt32BE(0x520, 0)
+              initBody.writeUInt32BE(1, 4)
+              socket.write(buildResponseFrame(0, 0, initBody))
+
+              // Process the kXR_protocol request embedded at bytes 20-43
+              const protoMessage = buffer.subarray(20, 44)
+              buffer = buffer.subarray(44)
+              processMessage(protoMessage, socket)
+              continue
+            }
+          }
+
+          const requestId = buffer.readUInt16BE(2)
+          const dlen = buffer.readUInt32BE(20)
+          const totalLen = 24 + dlen
+
+          if (buffer.length < totalLen) break
+
+          const message = buffer.subarray(0, totalLen)
+          buffer = buffer.subarray(totalLen)
+
+          processMessage(message, socket)
         }
       })
     })
