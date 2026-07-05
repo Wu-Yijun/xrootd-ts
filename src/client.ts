@@ -4,6 +4,7 @@ import { Multiplexer } from "./transport/multiplexer.ts";
 import { handshake } from "./session/handshake.ts";
 import { doAuthentication, registerAuthProtocol } from "./session/auth.ts";
 import { HostAuth } from "./security/host.ts";
+import { SSSAuth } from "./security/sss.ts";
 import { File } from "./api/file.ts";
 import { FileSystem } from "./api/filesystem.ts";
 import type { Session } from "./session/handshake.ts";
@@ -12,6 +13,8 @@ import type { DirectoryList } from "./api/types.ts";
 import { XRootDError } from "./api/errors.ts";
 import { ClientError, OpenFlags, RequestId } from "./protocol/constants.ts";
 import { buildEndsessRequest } from "./protocol/message.ts";
+import type { SecEnv } from "./config/sec-env.ts";
+import { loadAuthConfig } from "./config/loader.ts";
 
 export interface XRootDClientOptions {
   credentials?: {
@@ -20,6 +23,8 @@ export interface XRootDClientOptions {
   };
   timeout?: number;
   maxRedirects?: number;
+  /** Security environment configuration. Enables credential auto-discovery and protocol filtering. */
+  secEnv?: SecEnv;
 }
 
 export class XRootDClient {
@@ -56,21 +61,32 @@ export class XRootDClient {
       username: this.options.credentials?.username,
     });
 
+    const secEnv = this.options.secEnv;
+    const authConfig = loadAuthConfig({
+      url,
+      credentials: this.options.credentials,
+      secEnv,
+    });
+
     // Register supported authentication protocols
     registerAuthProtocol("host", () => new HostAuth());
+    if (authConfig.sssKey && SSSAuth.isSupported()) {
+      registerAuthProtocol("sss", () => new SSSAuth(authConfig.sssKey!));
+    }
 
-    // Perform authentication if server requires it and credentials are provided
-    if (this.session.secReqs && this.options.credentials) {
+    // Perform authentication if server requires it and credentials are available
+    if (this.session.secReqs && (authConfig.username || authConfig.password)) {
       const secEntity = await doAuthentication(
         this.mux,
         this.session.secReqs,
         {
           host: url.host,
           port: url.port,
-          username: this.options.credentials.username,
-          password: this.options.credentials.password,
+          username: authConfig.username,
+          password: authConfig.password,
           sessid: this.session.sessid,
         },
+        { protocolFilter: secEnv?.protocolFilter },
       );
       this.session.secEntity = secEntity;
     }
