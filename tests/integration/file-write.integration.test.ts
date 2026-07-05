@@ -194,7 +194,7 @@ describe("Integration: File.open with Write flags", () => {
       await setup.close();
 
       const file = new File(mux, session);
-      await file.open(path, { flags: OpenFlags.Append });
+      await file.open(path, { flags: OpenFlags.Write | OpenFlags.Append });
       await file.write(5, new TextEncoder().encode(" World"));
       await file.close();
 
