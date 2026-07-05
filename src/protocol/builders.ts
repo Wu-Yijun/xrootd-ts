@@ -329,8 +329,9 @@ export function buildMkdirRequest(
   msg.writeBytes(streamIdToBytes(streamId));
   msg.writeInt16BE(RequestId.Mkdir);
 
+  msg.writeUInt8(0);
+  msg.writeBytes(new Uint8Array(13));
   msg.writeInt16BE(mode & 0xffff);
-  msg.writeBytes(new Uint8Array(14));
 
   msg.writeInt32BE(pathBytes.length);
   msg.writeBytes(pathBytes);
