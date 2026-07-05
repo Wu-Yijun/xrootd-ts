@@ -8,6 +8,7 @@ import {
   RequestId,
   ResponseStatus,
   ServerError,
+  CRED_TYPE,
 } from "../protocol/constants.ts";
 import { parseErrorResponse } from "../protocol/message.ts";
 import { XRootDError } from "../api/errors.ts";
@@ -87,14 +88,6 @@ async function executeAuth(
 
   return protocol.getEntity();
 }
-
-const CRED_TYPE: Record<string, number> = {
-  host: 0,
-  sss: 1,
-  unix: 2,
-  krb5: 3,
-  gsi: 4,
-};
 
 function getCredType(name: string): number {
   const credType = CRED_TYPE[name];

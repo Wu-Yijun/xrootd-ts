@@ -168,3 +168,16 @@ export const kXR_ExpBind = 0x02;
 
 // ── Default XRootD port ───────────────────────────────────────────────────
 export const DEFAULT_PORT = 1094;
+
+// ── File mode flags ──────────────────────────────────────────────────────
+export const S_IFDIR = 0o040000;
+export const S_IFLNK = 0o120000;
+
+// ── Authentication credential types ─────────────────────────────────────
+export const CRED_TYPE: Record<string, number> = {
+  host: 0,
+  sss: 1,
+  unix: 2,
+  krb5: 3,
+  gsi: 4,
+};

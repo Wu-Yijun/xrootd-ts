@@ -1,4 +1,5 @@
 import type { OpenFlags } from "../protocol/constants.ts";
+import { S_IFDIR, S_IFLNK } from "../protocol/constants.ts";
 
 export interface OpenOptions {
   flags?: OpenFlags;
@@ -16,9 +17,6 @@ export interface StatInfo {
   get isOffline(): boolean;
   get isCached(): boolean;
 }
-
-const S_IFDIR = 0o040000;
-const S_IFLNK = 0o120000;
 
 export function createStatInfo(data: string): StatInfo {
   const parts = data.trim().split(/\s+/);
