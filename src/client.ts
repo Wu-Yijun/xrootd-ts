@@ -74,11 +74,11 @@ export class XRootDClient {
       registerAuthProtocol("sss", () => new SSSAuth(authConfig.sssKey!));
     }
 
-    // Perform authentication if server requires it and credentials are available
-    if (this.session.secReqs && (authConfig.username || authConfig.password)) {
+    // Perform authentication if server requires it (login response had secToken)
+    if (this.session.needsAuth && this.session.authProtocols?.length) {
       const secEntity = await doAuthentication(
         this.mux,
-        this.session.secReqs,
+        this.session.authProtocols,
         {
           host: url.host,
           port: url.port,
