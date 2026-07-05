@@ -83,12 +83,6 @@ export interface AuthConfig {
   protocol?: string;
 }
 
-export interface ClientOptions {
-  credentials?: AuthConfig;
-  timeout?: number;
-  maxRedirects?: number;
-}
-
 export interface DirectoryEntry {
   name: string;
   size: number;
