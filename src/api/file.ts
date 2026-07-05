@@ -6,6 +6,8 @@ import {
   buildWriteRequest,
   buildCloseRequest,
   buildStatRequest,
+  buildSyncRequest,
+  buildTruncateRequest,
   parseOpenResponse,
   parseErrorResponse,
 } from '../protocol/message.ts'
@@ -143,6 +145,34 @@ export class File {
     }
 
     throw new XRootDError(3012, `Unexpected stat response status: ${frame.status}`)
+  }
+
+  async sync(): Promise<void> {
+    if (!this._isOpen || !this.fhandle) {
+      throw new XRootDError(3004, 'File is not open')
+    }
+
+    const buf = buildSyncRequest(0, this.fhandle)
+    const frame = await sendRequest(this.mux, buf)
+
+    if (frame.status === ResponseStatus.Error) {
+      const { errnum, errmsg } = parseErrorResponse(frame.body)
+      throw new XRootDError(errnum, errmsg)
+    }
+  }
+
+  async truncate(size: number): Promise<void> {
+    if (!this._isOpen || !this.fhandle) {
+      throw new XRootDError(3004, 'File is not open')
+    }
+
+    const buf = buildTruncateRequest(0, this.fhandle, size)
+    const frame = await sendRequest(this.mux, buf)
+
+    if (frame.status === ResponseStatus.Error) {
+      const { errnum, errmsg } = parseErrorResponse(frame.body)
+      throw new XRootDError(errnum, errmsg)
+    }
   }
 }
 

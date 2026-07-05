@@ -199,4 +199,70 @@ describe('File', () => {
 
     mux.close()
   })
+
+  it('sync() sends sync request', async () => {
+    const transport = new MockTransportForFile()
+    const mux = new Multiplexer(transport)
+    const file = new File(mux, testSession)
+
+    const fhandle = Buffer.from([0xaa, 0xbb, 0xcc, 0xdd])
+    transport.enqueueResponse(0, fhandle)
+    await file.open('/test', { flags: 0x0020 })
+
+    transport.enqueueResponse(0, Buffer.alloc(0))
+    await file.sync()
+
+    const syncReq = transport.sentData[transport.sentData.length - 1]
+    assert.equal(syncReq.readUInt16BE(2), 3016) // kXR_sync
+
+    transport.enqueueResponse(0, Buffer.alloc(0))
+    await file.close()
+    mux.close()
+  })
+
+  it('sync() on closed file throws', async () => {
+    const transport = new MockTransportForFile()
+    const mux = new Multiplexer(transport)
+    const file = new File(mux, testSession)
+
+    await assert.rejects(
+      () => file.sync(),
+      (err: any) => err instanceof XRootDError && err.code === 3004,
+    )
+
+    mux.close()
+  })
+
+  it('truncate() sends truncate request', async () => {
+    const transport = new MockTransportForFile()
+    const mux = new Multiplexer(transport)
+    const file = new File(mux, testSession)
+
+    const fhandle = Buffer.from([0xaa, 0xbb, 0xcc, 0xdd])
+    transport.enqueueResponse(0, fhandle)
+    await file.open('/test', { flags: 0x0020 })
+
+    transport.enqueueResponse(0, Buffer.alloc(0))
+    await file.truncate(1024)
+
+    const truncReq = transport.sentData[transport.sentData.length - 1]
+    assert.equal(truncReq.readUInt16BE(2), 3028) // kXR_truncate
+
+    transport.enqueueResponse(0, Buffer.alloc(0))
+    await file.close()
+    mux.close()
+  })
+
+  it('truncate() on closed file throws', async () => {
+    const transport = new MockTransportForFile()
+    const mux = new Multiplexer(transport)
+    const file = new File(mux, testSession)
+
+    await assert.rejects(
+      () => file.truncate(0),
+      (err: any) => err instanceof XRootDError && err.code === 3004,
+    )
+
+    mux.close()
+  })
 })
