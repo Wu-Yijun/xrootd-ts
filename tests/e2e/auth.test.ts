@@ -63,9 +63,9 @@ function createAuthServer(
             for (let i = 0; i < 16; i++) body[i] = i + 1
             socket.write(buildResponseFrame(streamId, 0, body))
           } else if (requestId === 3000) {
-            // kXR_auth
-            const credType = reqBody.readUInt32BE(12)
-            const credData = Buffer.from(reqBody.subarray(16))
+            // kXR_auth - credType is in body bytes 12-15, credData is extra data
+            const credType = message.readUInt32BE(12)
+            const credData = Buffer.from(message.subarray(24))
 
             if (authHandler) {
               const result = authHandler(credType, credData)
