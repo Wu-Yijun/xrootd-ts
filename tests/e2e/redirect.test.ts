@@ -100,23 +100,30 @@ describe('E2E: redirect flow', () => {
     try {
       const transport1 = new Transport()
       await transport1.connect('127.0.0.1', addrA.port)
-      const mux1 = new Multiplexer(transport1)
+
+      let capturedRedirPort = 0
+      const mux1 = new Multiplexer(transport1, {
+        maxRedirects: 16,
+        onRedirect: async (host, port) => {
+          capturedRedirPort = port
+          mux1.close()
+          await transport1.close()
+        },
+      })
 
       const protoFrame = await mux1.request(3006, new Uint8Array(16))
       assert.equal(protoFrame.status, 0)
 
-      const loginFrame = await mux1.request(3007, new Uint8Array(16))
-      assert.equal(loginFrame.status, 4004, 'Expected kXR_redirect status')
-
-      const redirBody = loginFrame.body
-      const redirPort = redirBody.readInt32BE(0)
-      assert.equal(redirPort, portB)
-
-      mux1.close()
-      await transport1.close()
+      await assert.rejects(
+        mux1.request(3007, new Uint8Array(16)),
+        (err: any) => {
+          assert.equal(capturedRedirPort, portB, 'onRedirect should have captured the redirect port')
+          return err instanceof Error && /closed/i.test(err.message)
+        },
+      )
 
       const transport2 = new Transport()
-      await transport2.connect('127.0.0.1', redirPort)
+      await transport2.connect('127.0.0.1', capturedRedirPort)
       const mux2 = new Multiplexer(transport2)
 
       const protoFrame2 = await mux2.request(3006, new Uint8Array(16))
