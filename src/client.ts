@@ -86,21 +86,17 @@ export class XRootDClient {
     path: string,
     options?: { flags?: number; mode?: number },
   ): Promise<File> {
-    if (!this.mux || !this.session) {
-      throw new XRootDError(ClientError.Uninitialized, "Client not connected");
-    }
+    this.ensureConnected();
 
-    const file = new File(this.mux, this.session);
+    const file = new File(this.mux!, this.session!);
     await file.open(path, options);
     return file;
   }
 
   async stat(path: string): Promise<StatInfo> {
-    if (!this.mux || !this.session) {
-      throw new XRootDError(ClientError.Uninitialized, "Client not connected");
-    }
+    this.ensureConnected();
 
-    const file = new File(this.mux, this.session);
+    const file = new File(this.mux!, this.session!);
     await file.open(path, { flags: OpenFlags.Read });
     try {
       return await file.stat();
@@ -110,45 +106,33 @@ export class XRootDClient {
   }
 
   async statFilesystem(path: string): Promise<StatInfo> {
-    if (!this.fs) {
-      throw new XRootDError(ClientError.Uninitialized, "Client not connected");
-    }
-    return this.fs.stat(path);
+    this.ensureFileSystem();
+    return this.fs!.stat(path);
   }
 
   async readdir(path: string): Promise<DirectoryList> {
-    if (!this.fs) {
-      throw new XRootDError(ClientError.Uninitialized, "Client not connected");
-    }
-    return this.fs.readdir(path);
+    this.ensureFileSystem();
+    return this.fs!.readdir(path);
   }
 
   async mkdir(path: string, mode?: number): Promise<void> {
-    if (!this.fs) {
-      throw new XRootDError(ClientError.Uninitialized, "Client not connected");
-    }
-    return this.fs.mkdir(path, mode);
+    this.ensureFileSystem();
+    return this.fs!.mkdir(path, mode);
   }
 
   async rmdir(path: string): Promise<void> {
-    if (!this.fs) {
-      throw new XRootDError(ClientError.Uninitialized, "Client not connected");
-    }
-    return this.fs.rmdir(path);
+    this.ensureFileSystem();
+    return this.fs!.rmdir(path);
   }
 
   async rm(path: string): Promise<void> {
-    if (!this.fs) {
-      throw new XRootDError(ClientError.Uninitialized, "Client not connected");
-    }
-    return this.fs.rm(path);
+    this.ensureFileSystem();
+    return this.fs!.rm(path);
   }
 
   async mv(source: string, target: string): Promise<void> {
-    if (!this.fs) {
-      throw new XRootDError(ClientError.Uninitialized, "Client not connected");
-    }
-    return this.fs.mv(source, target);
+    this.ensureFileSystem();
+    return this.fs!.mv(source, target);
   }
 
   async close(): Promise<void> {
@@ -172,5 +156,17 @@ export class XRootDClient {
 
   get location(): string {
     return this.url.getLocation();
+  }
+
+  private ensureConnected(): void {
+    if (!this.mux || !this.session) {
+      throw new XRootDError(ClientError.Uninitialized, "Client not connected");
+    }
+  }
+
+  private ensureFileSystem(): void {
+    if (!this.fs) {
+      throw new XRootDError(ClientError.Uninitialized, "Client not connected");
+    }
   }
 }
