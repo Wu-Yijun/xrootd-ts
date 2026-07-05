@@ -37,6 +37,16 @@ function createAuthServer(
         buffer = Buffer.concat([buffer, chunk])
 
         while (buffer.length >= 24) {
+          // Skip ClientInitHandShake (20 B) if merged with first request
+          if (buffer.length >= 44 &&
+              buffer.readUInt32BE(0) === 0 &&
+              buffer.readUInt32BE(4) === 0 &&
+              buffer.readUInt32BE(8) === 0 &&
+              buffer.readUInt32BE(12) === 4 &&
+              buffer.readUInt32BE(16) === 2012) {
+            buffer = buffer.subarray(20)
+          }
+
           const requestId = buffer.readUInt16BE(2)
           const dlen = buffer.readUInt32BE(20)
           const totalLen = 24 + dlen
@@ -50,7 +60,11 @@ function createAuthServer(
           const { body: reqBody } = parseRequest(message)
 
           if (requestId === 3006) {
-            // kXR_protocol - include secReqs as null-terminated string after pval+flags
+            // kXR_protocol - send ServerInitHandShake first, then protocol response
+            const initBody = Buffer.alloc(8)
+            socket.write(buildResponseFrame(0, 0, initBody))
+
+            // Then the protocol response
             const secReqsBuf = Buffer.from(secReqs + '\0')
             const body = Buffer.alloc(8 + secReqsBuf.length)
             body.writeUInt32BE(0x520, 0)
