@@ -84,7 +84,7 @@ function createFileSystemServer(): Promise<{ server: net.Server; port: number }>
               const entries: Buffer[] = []
               for (const [name, info] of dir) {
                 const flags = info.isDir ? 0x4000 : 0
-                const entry = Buffer.from(`${name}\0000:0:${flags}\n`)
+                const entry = Buffer.from(`${name}\x000:0:${flags}\n`)
                 entries.push(entry)
               }
               const body = entries.length > 0

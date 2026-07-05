@@ -2,7 +2,7 @@ import type { SecurityProtocol, AuthParams, SecEntity } from '../security/interf
 import type { Multiplexer } from '../transport/multiplexer.ts'
 import type { Frame } from '../transport/framer.ts'
 import { RequestId, ResponseStatus } from '../protocol/constants.ts'
-import { buildAuthRequest, parseErrorResponse } from '../protocol/message.ts'
+import { parseErrorResponse } from '../protocol/message.ts'
 import { XRootDError } from '../api/errors.ts'
 
 const authProtocols = new Map<string, () => SecurityProtocol>()
@@ -47,10 +47,17 @@ async function executeAuth(
   const creds = await protocol.getCredentials(params)
   const credType = getCredType(protocol.name)
 
+  // Build auth body: reserved[12] + credType[4]
+  const body = new Uint8Array(16)
+  body[12] = (credType >> 24) & 0xff
+  body[13] = (credType >> 16) & 0xff
+  body[14] = (credType >> 8) & 0xff
+  body[15] = credType & 0xff
+
   let frame = await mux.request(
     RequestId.Auth,
-    new Uint8Array(16),
-    buildAuthRequest(0, credType, creds),
+    body,
+    creds,
   )
 
   while (frame.status === ResponseStatus.Authmore) {
@@ -58,8 +65,8 @@ async function executeAuth(
     const response = await protocol.processChallenge(challenge)
     frame = await mux.request(
       RequestId.Auth,
-      new Uint8Array(16),
-      buildAuthRequest(0, credType, response),
+      body,
+      response,
     )
   }
 

@@ -50,12 +50,12 @@ function createAuthServer(
           const { body: reqBody } = parseRequest(message)
 
           if (requestId === 3006) {
-            // kXR_protocol - include secReqs
-            const protoText = `v0x520 0x09 ${secReqs}`
-            const body = Buffer.alloc(8 + protoText.length + 1)
+            // kXR_protocol - include secReqs as null-terminated string after pval+flags
+            const secReqsBuf = Buffer.from(secReqs + '\0')
+            const body = Buffer.alloc(8 + secReqsBuf.length)
             body.writeUInt32BE(0x520, 0)
             body.writeUInt32BE(0x09, 4)
-            Buffer.from(protoText + '\0').copy(body, 8)
+            secReqsBuf.copy(body, 8)
             socket.write(buildResponseFrame(streamId, 0, body))
           } else if (requestId === 3007) {
             // kXR_login

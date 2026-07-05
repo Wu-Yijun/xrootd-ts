@@ -292,16 +292,25 @@ describe('E2E: redirect auto-handling', () => {
     try {
       const transport = new Transport()
       await transport.connect('127.0.0.1', addr.port)
-      const mux = new Multiplexer(transport)
+      const mux = new Multiplexer(transport, {
+        maxRedirects: 3,
+        onRedirect: async () => {
+          // Try to connect to unreachable port - should fail
+          const t = new Transport()
+          await t.connect('127.0.0.1', 1)
+        },
+      })
 
       const protoFrame = await mux.request(3006, new Uint8Array(16))
       assert.equal(protoFrame.status, 0)
 
-      let redirectError: Error | null = null
-      mux.onRedirect
-      const loginFrame = await mux.request(3007, new Uint8Array(16))
-      // The redirect response comes back, then onRedirect tries to connect to port 1
-      // which should fail
+      try {
+        // Login request will redirect to unreachable port
+        await mux.request(3007, new Uint8Array(16))
+        // If we get here, the redirect handler failed silently
+      } catch (err) {
+        assert.ok(err instanceof Error)
+      }
 
       mux.close()
       await transport.close()
