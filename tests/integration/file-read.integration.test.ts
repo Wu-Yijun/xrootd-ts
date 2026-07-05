@@ -1,4 +1,4 @@
-import { describe, it, before } from 'node:test'
+import { describe, it, before, after } from 'node:test'
 import assert from 'node:assert/strict'
 import { Transport } from '../../src/transport/transport.ts'
 import { Multiplexer } from '../../src/transport/multiplexer.ts'
@@ -6,6 +6,7 @@ import { handshake } from '../../src/session/handshake.ts'
 import { XRootDUrl } from '../../src/url/url.ts'
 import { File } from '../../src/api/file.ts'
 import { XRootDError } from '../../src/api/errors.ts'
+import { XRootDClient } from '../../src/client.ts'
 import type { Session } from '../../src/session/handshake.ts'
 import {
   XROOTD_HOST,
@@ -42,9 +43,7 @@ async function createConnectedClient(): Promise<{
 }
 
 describe('Integration: file read flow', () => {
-  before(async function (this: { skip?: () => void }) {
-    await skipIfServerUnavailable.call(this)
-  })
+  before(skipIfServerUnavailable)
 
   it('login -> open -> read -> close', async () => {
     const { transport, mux, session } = await createConnectedClient()
@@ -131,6 +130,7 @@ describe('Integration: file read flow', () => {
       const info = await file.stat()
       assert.ok(info, 'stat info should be defined')
       assert.ok(info.size > 0, 'file size should be > 0')
+      assert.equal(info.size, Buffer.byteLength(EXPECTED_FILE_CONTENTS), 'size should match content length')
 
       await file.close()
     } finally {
@@ -158,6 +158,63 @@ describe('Integration: file read flow', () => {
     } finally {
       mux.close()
       await transport.close()
+    }
+  })
+})
+
+describe('Integration: XRootDClient file operations', () => {
+  before(skipIfServerUnavailable)
+
+  it('client.open -> read -> close', async () => {
+    const client = new XRootDClient(`root://${XROOTD_HOST}:${XROOTD_PORT}/`)
+
+    try {
+      await withTimeout(client.connect(), 5000, 'client.connect()')
+      assert.equal(client.isConnected, true)
+
+      const file = await client.open(TEST_FILE_PATH)
+      assert.equal(file.isOpen, true)
+
+      const data = await file.read(0, 5)
+      const text = new TextDecoder().decode(data)
+      assert.equal(text, 'Hello')
+
+      await file.close()
+      assert.equal(file.isOpen, false)
+    } finally {
+      await client.close()
+      assert.equal(client.isConnected, false)
+    }
+  })
+
+  it('client.stat returns valid info', async () => {
+    const client = new XRootDClient(`root://${XROOTD_HOST}:${XROOTD_PORT}/`)
+
+    try {
+      await withTimeout(client.connect(), 5000, 'client.connect()')
+
+      const info = await client.stat(TEST_FILE_PATH)
+      assert.ok(info.size > 0, 'file size should be > 0')
+    } finally {
+      await client.close()
+    }
+  })
+
+  it('client.open non-existent file throws', async () => {
+    const client = new XRootDClient(`root://${XROOTD_HOST}:${XROOTD_PORT}/`)
+
+    try {
+      await withTimeout(client.connect(), 5000, 'client.connect()')
+
+      try {
+        await client.open('/test/nonexistent_file_12345.txt')
+        assert.fail('Expected error')
+      } catch (err) {
+        assert.ok(err instanceof XRootDError)
+        assert.equal(err.code, 3011)
+      }
+    } finally {
+      await client.close()
     }
   })
 })

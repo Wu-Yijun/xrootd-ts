@@ -1,4 +1,5 @@
 import { createConnection } from 'node:net'
+import type { TestContext } from 'node:test'
 
 export const XROOTD_HOST = process.env.XROOTD_HOST || 'localhost'
 export const XROOTD_PORT = parseInt(process.env.XROOTD_PORT || '1094', 10)
@@ -25,11 +26,11 @@ export function checkServerAvailable(): Promise<boolean> {
   })
 }
 
-export async function skipIfServerUnavailable(this: { skip?: () => void }): Promise<void> {
+export async function skipIfServerUnavailable(this: TestContext): Promise<void> {
   const available = await checkServerAvailable()
   if (!available) {
     console.log(`  ⏭ Skipping: xrootd mock server not available at ${XROOTD_HOST}:${XROOTD_PORT}`)
     console.log(`     Start it with: pnpm mock-server:up`)
-    this.skip?.()
+    this.skip()
   }
 }

@@ -4,6 +4,7 @@ import { Transport } from '../../src/transport/transport.ts'
 import { Multiplexer } from '../../src/transport/multiplexer.ts'
 import { handshake } from '../../src/session/handshake.ts'
 import { XRootDUrl } from '../../src/url/url.ts'
+import { XRootDClient } from '../../src/client.ts'
 import {
   XROOTD_HOST,
   XROOTD_PORT,
@@ -20,9 +21,7 @@ function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise
 }
 
 describe('Integration: handshake', () => {
-  before(async function (this: { skip?: () => void }) {
-    await skipIfServerUnavailable.call(this)
-  })
+  before(skipIfServerUnavailable)
 
   it('handshake() returns Session with valid sessid and protocolVersion', async () => {
     const transport = new Transport()
@@ -44,6 +43,44 @@ describe('Integration: handshake', () => {
     } finally {
       mux.close()
       await transport.close()
+    }
+  })
+
+  it('handshake() with username returns valid Session', async () => {
+    const transport = new Transport()
+    await transport.connect(XROOTD_HOST, XROOTD_PORT)
+    const mux = new Multiplexer(transport)
+
+    try {
+      const url = new XRootDUrl(`root://${XROOTD_HOST}:${XROOTD_PORT}/`)
+      const session = await withTimeout(
+        handshake(mux, url, { username: 'testuser', pid: 12345 }),
+        5000,
+        'handshake with username',
+      )
+
+      assert.ok(session.sessid.length === 16)
+      assert.equal(session.protocolVersion, 0x520)
+    } finally {
+      mux.close()
+      await transport.close()
+    }
+  })
+
+  it('XRootDClient.connect() completes full handshake', async () => {
+    const client = new XRootDClient(
+      `root://${XROOTD_HOST}:${XROOTD_PORT}/`,
+    )
+
+    try {
+      await withTimeout(
+        client.connect(),
+        5000,
+        'client.connect()',
+      )
+      assert.equal(client.isConnected, true, 'client should be connected')
+    } finally {
+      await client.close()
     }
   })
 })
