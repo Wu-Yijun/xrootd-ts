@@ -3,14 +3,18 @@
  * Each function parses a response body Buffer into a typed object.
  */
 
-import { get32, getBytes, getString } from "./codec.ts";
+import { get16, get32, getBytes, getString } from "./codec.ts";
 import type { DirectoryEntry } from "../api/types.ts";
 
 /** Protocol response from kXR_protocol. */
 export interface ProtocolResponse {
   pval: number;
   flags: number;
-  secReqs?: string;
+  /** Security level from secReqs struct (0=none, 1=compat, 2=std, 3=intense, 4=pedantic). */
+  seclvl?: number;
+  /** Security options from secReqs struct. */
+  secopt?: number;
+  /** Bind preferences from bifReqs struct (comma-separated protocol list). */
   bifReqs?: string;
 }
 
@@ -54,9 +58,11 @@ export interface DirlistResponse {
 /**
  * Parse kXR_protocol OK response body.
  *
- * Body layout:
- *   pval[4] + flags[4] + secReqs (remaining bytes, NUL-terminated) +
- *   bifReqs (remaining bytes, NUL-terminated)
+ * Body layout (binary):
+ *   pval[4] + flags[4] +
+ *   [optional bifReqs struct: tag[1]='B' + rsvd[1] + bifILen[2] + bifInfo[bifILen]] +
+ *   [optional secReqs struct: tag[1]='S' + rsvd[1] + secver[1] + secopt[1] +
+ *                             seclvl[1] + secvsz[1] + secvec[secvsz*2]]
  */
 export function parseProtocolResponse(body: Buffer): ProtocolResponse {
   let off = 0;
@@ -65,20 +71,54 @@ export function parseProtocolResponse(body: Buffer): ProtocolResponse {
   const [flags, o2] = get32(body, off);
   off = o2;
 
-  let secReqs: string | undefined;
+  let seclvl: number | undefined;
+  let secopt: number | undefined;
   let bifReqs: string | undefined;
 
-  if (off < body.length) {
-    const [s, o3] = getString(body, off, body.length - off);
-    off = o3;
-    if (s) secReqs = s;
-  }
-  if (off < body.length) {
-    const [b] = getString(body, off, body.length - off);
-    if (b) bifReqs = b;
+  // Parse optional structs identified by tag byte
+  while (off < body.length) {
+    const tag = body[off];
+
+    if (tag === 0x42 /* 'B' */ && off + 4 <= body.length) {
+      // bifReqs struct: tag[1] + rsvd[1] + bifILen[2] + bifInfo[bifILen]
+      const [bifILen, lenOff] = get16(body, off + 2);
+      off = lenOff;
+      if (bifILen > 0 && off + bifILen <= body.length) {
+        const raw = body.toString("utf8", off, off + bifILen).replace(/\0+$/, "");
+        if (raw) bifReqs = raw;
+        off += bifILen;
+      } else {
+        break;
+      }
+    } else if (tag === 0x53 /* 'S' */ && off + 6 <= body.length) {
+      // secReqs struct: tag[1] + rsvd[1] + secver[1] + secopt[1] + seclvl[1] + secvsz[1]
+      secopt = body[off + 3];
+      seclvl = body[off + 4];
+      const secvsz = body[off + 5];
+      off += 6 + secvsz * 2; // skip secvec entries (2 bytes each)
+    } else {
+      break;
+    }
   }
 
-  return { pval, flags, secReqs, bifReqs };
+  return { pval, flags, seclvl, secopt, bifReqs };
+}
+
+/**
+ * Parse secToken from kXR_login response to extract auth protocol names.
+ *
+ * Format: NUL-terminated string with &P=<name>[,<args>] entries.
+ * Example: "&P=host&P=gsi,v:42,c:ssl" → ["host", "gsi"]
+ */
+export function parseSecToken(token: Uint8Array): string[] {
+  const str = Buffer.from(token).toString("utf8");
+  const protocols: string[] = [];
+  const re = /&P=([a-zA-Z0-9_+-]+)/g;
+  let match;
+  while ((match = re.exec(str)) !== null) {
+    protocols.push(match[1]);
+  }
+  return protocols;
 }
 
 /**

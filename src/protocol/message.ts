@@ -33,6 +33,7 @@ export {
   parseOpenResponse,
   parseProtocolResponse,
   parseRedirectResponse,
+  parseSecToken,
   parseWaitResponse,
 } from "./parsers.ts";
 

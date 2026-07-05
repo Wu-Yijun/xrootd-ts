@@ -55,6 +55,7 @@ export {
   parseOpenResponse,
   parseProtocolResponse,
   parseRedirectResponse,
+  parseSecToken,
   parseWaitResponse,
 } from "./protocol/message.ts";
 export type {
