@@ -1,6 +1,7 @@
 import { Multiplexer } from "../transport/multiplexer.ts";
 import { XRootDUrl } from "../url/url.ts";
 import {
+  ClientError,
   kXR_bifreqs,
   kXR_ExpLogin,
   kXR_secreqs,
@@ -16,6 +17,7 @@ import {
   parseRedirectResponse,
 } from "../protocol/message.ts";
 import { createFrameReader } from "../utils/frame-reader.ts";
+import { XRootDError } from "../api/errors.ts";
 
 export interface Session {
   sessid: Uint8Array;
@@ -67,13 +69,15 @@ export async function handshake(
 
     if (protoFrame.status === ResponseStatus.Error) {
       const err = parseErrorResponse(protoFrame.body);
-      throw new Error(
+      throw new XRootDError(
+        ClientError.InternalError,
         `Protocol handshake error: ${err.errmsg} (${err.errnum})`,
       );
     }
 
     if (protoFrame.status !== ResponseStatus.Ok) {
-      throw new Error(
+      throw new XRootDError(
+        ClientError.InternalError,
         `Unexpected protocol response status: ${protoFrame.status}`,
       );
     }
@@ -88,16 +92,25 @@ export async function handshake(
 
     if (loginFrame.status === ResponseStatus.Error) {
       const err = parseErrorResponse(loginFrame.body);
-      throw new Error(`Login error: ${err.errmsg} (${err.errnum})`);
+      throw new XRootDError(
+        ClientError.InternalError,
+        `Login error: ${err.errmsg} (${err.errnum})`,
+      );
     }
 
     if (loginFrame.status === ResponseStatus.Redirect) {
       const redir = parseRedirectResponse(loginFrame.body);
-      throw new Error(`Login redirect to ${redir.host}:${redir.port}`);
+      throw new XRootDError(
+        ClientError.Redirect,
+        `Login redirect to ${redir.host}:${redir.port}`,
+      );
     }
 
     if (loginFrame.status !== ResponseStatus.Ok) {
-      throw new Error(`Unexpected login response status: ${loginFrame.status}`);
+      throw new XRootDError(
+        ClientError.InternalError,
+        `Unexpected login response status: ${loginFrame.status}`,
+      );
     }
 
     const loginResp = parseLoginResponse(loginFrame.body);

@@ -1,9 +1,10 @@
 import type { ITransport } from "./interface.ts";
 import { type Frame, Framer } from "./framer.ts";
 import { Message } from "../protocol/message.ts";
-import { ResponseStatus } from "../protocol/constants.ts";
+import { ClientError, ResponseStatus } from "../protocol/constants.ts";
 import { parseRedirectResponse } from "../protocol/message.ts";
 import { streamIdToBytes, bytesToStreamId } from "../utils/bytes.ts";
+import { XRootDError } from "../api/errors.ts";
 
 interface PendingRequest {
   resolve: (frame: Frame) => void;
@@ -68,7 +69,10 @@ export class Multiplexer {
     while (this.pending.has(sid)) {
       sid = (sid + 1) & 0xffff;
       if (sid === this.nextStreamId) {
-        throw new Error("Max concurrent requests (65535) reached");
+        throw new XRootDError(
+          ClientError.InternalError,
+          "Max concurrent requests (65535) reached",
+        );
       }
     }
     this.nextStreamId = (sid + 1) & 0xffff;
@@ -81,7 +85,7 @@ export class Multiplexer {
     data?: Uint8Array,
   ): Promise<Frame> {
     if (this.closed) {
-      throw new Error("Multiplexer is closed");
+      throw new XRootDError(ClientError.InternalError, "Multiplexer is closed");
     }
 
     const sid = this.allocateStreamId();

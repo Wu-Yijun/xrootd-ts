@@ -5,6 +5,7 @@ import type {
 } from "../security/interface.ts";
 import type { Multiplexer } from "../transport/multiplexer.ts";
 import {
+  ClientError,
   RequestId,
   ResponseStatus,
   ServerError,
@@ -92,7 +93,10 @@ async function executeAuth(
 function getCredType(name: string): number {
   const credType = CRED_TYPE[name];
   if (credType === undefined) {
-    throw new Error(`Unknown auth protocol: ${name}`);
+    throw new XRootDError(
+      ClientError.BadRequest,
+      `Unknown auth protocol: ${name}`,
+    );
   }
   return credType;
 }
