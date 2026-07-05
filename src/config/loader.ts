@@ -25,10 +25,8 @@ export function loadAuthConfig(options: {
 }): ResolvedAuthConfig {
   const { url, credentials, secEnv } = options;
 
-  const username =
-    credentials?.username ?? url?.user ?? secEnv?.username;
-  const password =
-    credentials?.password ?? url?.password ?? secEnv?.password;
+  const username = credentials?.username ?? url?.user ?? secEnv?.username;
+  const password = credentials?.password ?? url?.password ?? secEnv?.password;
 
   let sssKey: Buffer | undefined;
   if (secEnv?.sssKeytab) {

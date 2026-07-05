@@ -6,9 +6,9 @@ import { OpenFlags } from "../../src/protocol/constants.ts";
 import {
   createConnectedClient,
   ensureTestWriteDir,
+  ifServerUnavailable,
   randomTestId,
   SERVER_URL,
-  skipIfServerUnavailable,
   TEST_FILE_PATH,
   TEST_WRITE_DIR,
   testFilePath,
@@ -17,9 +17,11 @@ import {
   XROOTD_PORT,
 } from "./setup.ts";
 
-describe("Integration: XRootDClient lifecycle", () => {
-  before(skipIfServerUnavailable);
+const skip = await ifServerUnavailable()
+  ? "SKIP: XRootD server not available"
+  : undefined;
 
+describe("Integration: XRootDClient lifecycle", { skip }, () => {
   it("connect sets isConnected = true", async () => {
     const client = new XRootDClient(SERVER_URL);
     assert.equal(
@@ -73,8 +75,7 @@ describe("Integration: XRootDClient lifecycle", () => {
   });
 });
 
-describe("Integration: XRootDClient filesystem wrappers", () => {
-  before(skipIfServerUnavailable);
+describe("Integration: XRootDClient filesystem wrappers", { skip }, () => {
   before(async () => {
     await ensureTestWriteDir();
   });
@@ -157,9 +158,7 @@ describe("Integration: XRootDClient filesystem wrappers", () => {
   });
 });
 
-describe("Integration: XRootDClient stat methods", () => {
-  before(skipIfServerUnavailable);
-
+describe("Integration: XRootDClient stat methods", { skip }, () => {
   it("stat returns StatInfo with expected fields", async () => {
     const client = await createConnectedClient();
     try {
@@ -223,9 +222,7 @@ describe("Integration: XRootDClient stat methods", () => {
   });
 });
 
-describe("Integration: XRootDClient with options", () => {
-  before(skipIfServerUnavailable);
-
+describe("Integration: XRootDClient with options", { skip }, () => {
   it("timeout option: operations complete within timeout", async () => {
     const client = new XRootDClient(SERVER_URL, { timeout: 10000 });
     try {

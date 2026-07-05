@@ -10,11 +10,15 @@ import { XRootDClient } from "../../src/client.ts";
 import type { Session } from "../../src/session/handshake.ts";
 import {
   EXPECTED_FILE_CONTENTS,
-  skipIfServerUnavailable,
+  ifServerUnavailable,
   TEST_FILE_PATH,
   XROOTD_HOST,
   XROOTD_PORT,
 } from "./setup.ts";
+
+const skip = await ifServerUnavailable()
+  ? "SKIP: XRootD server not available"
+  : undefined;
 
 function withTimeout<T>(
   promise: Promise<T>,
@@ -46,9 +50,7 @@ async function createConnectedClient(): Promise<{
   return { transport, mux, session };
 }
 
-describe("Integration: file read flow", () => {
-  before(skipIfServerUnavailable);
-
+describe("Integration: file read flow", { skip }, () => {
   it("login -> open -> read -> close", async () => {
     const { transport, mux, session } = await createConnectedClient();
 
@@ -170,9 +172,7 @@ describe("Integration: file read flow", () => {
   });
 });
 
-describe("Integration: XRootDClient file operations", () => {
-  before(skipIfServerUnavailable);
-
+describe("Integration: XRootDClient file operations", { skip }, () => {
   it("client.open -> read -> close", async () => {
     const client = new XRootDClient(`root://${XROOTD_HOST}:${XROOTD_PORT}/`);
 
@@ -230,9 +230,7 @@ describe("Integration: XRootDClient file operations", () => {
   });
 });
 
-describe("Integration: file read edge cases", () => {
-  before(skipIfServerUnavailable);
-
+describe("Integration: file read edge cases", { skip }, () => {
   it("read with size larger than file returns available bytes", async () => {
     const { transport, mux, session } = await createConnectedClient();
     try {

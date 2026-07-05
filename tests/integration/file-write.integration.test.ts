@@ -9,8 +9,8 @@ import {
   createConnectedClient,
   createConnectedLowLevel,
   ensureTestWriteDir,
+  ifServerUnavailable,
   randomTestId,
-  skipIfServerUnavailable,
   TEST_WRITE_DIR,
   testFilePath,
   withTimeout,
@@ -18,8 +18,11 @@ import {
   XROOTD_PORT,
 } from "./setup.ts";
 
-describe("Integration: File.write", () => {
-  before(skipIfServerUnavailable);
+const skip = await ifServerUnavailable()
+  ? "SKIP: XRootD server not available"
+  : undefined;
+
+describe("Integration: File.write", { skip }, () => {
   before(async () => {
     await ensureTestWriteDir();
   });
@@ -135,8 +138,7 @@ describe("Integration: File.write", () => {
   });
 });
 
-describe("Integration: File.open with Write flags", () => {
-  before(skipIfServerUnavailable);
+describe("Integration: File.open with Write flags", { skip }, () => {
   before(async () => {
     await ensureTestWriteDir();
   });
@@ -211,8 +213,7 @@ describe("Integration: File.open with Write flags", () => {
   });
 });
 
-describe("Integration: File.sync and truncate", () => {
-  before(skipIfServerUnavailable);
+describe("Integration: File.sync and truncate", { skip }, () => {
   before(async () => {
     await ensureTestWriteDir();
   });
@@ -308,9 +309,7 @@ describe("Integration: File.sync and truncate", () => {
   });
 });
 
-describe("Integration: File state errors", () => {
-  before(skipIfServerUnavailable);
-
+describe("Integration: File state errors", { skip }, () => {
   it("read on closed file throws XRootDError code 3004", async () => {
     const { transport, mux, session } = await createConnectedLowLevel();
     try {
@@ -381,8 +380,7 @@ describe("Integration: File state errors", () => {
   });
 });
 
-describe("Integration: XRootDClient write flow", () => {
-  before(skipIfServerUnavailable);
+describe("Integration: XRootDClient write flow", { skip }, () => {
   before(async () => {
     await ensureTestWriteDir();
   });

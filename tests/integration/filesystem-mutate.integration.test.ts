@@ -7,15 +7,17 @@ import { OpenFlags } from "../../src/protocol/constants.ts";
 import {
   closeLowLevel,
   createConnectedLowLevel,
+  ifServerUnavailable,
   randomTestId,
-  skipIfServerUnavailable,
   TEST_WRITE_DIR,
   testFilePath,
 } from "./setup.ts";
 
-describe("Integration: FileSystem.mkdir", () => {
-  before(skipIfServerUnavailable);
+const skip = await ifServerUnavailable()
+  ? "SKIP: XRootD server not available"
+  : undefined;
 
+describe("Integration: FileSystem.mkdir", { skip }, () => {
   it("mkdir creates a new directory", async () => {
     const { transport, mux, session } = await createConnectedLowLevel();
     const dirPath = `${TEST_WRITE_DIR}/mkdir-${randomTestId()}`;
@@ -65,9 +67,7 @@ describe("Integration: FileSystem.mkdir", () => {
   });
 });
 
-describe("Integration: FileSystem.rmdir", () => {
-  before(skipIfServerUnavailable);
-
+describe("Integration: FileSystem.rmdir", { skip }, () => {
   it("rmdir removes an empty directory", async () => {
     const { transport, mux, session } = await createConnectedLowLevel();
     const dirPath = `${TEST_WRITE_DIR}/rmdir-${randomTestId()}`;
@@ -103,9 +103,7 @@ describe("Integration: FileSystem.rmdir", () => {
   });
 });
 
-describe("Integration: FileSystem.rm", () => {
-  before(skipIfServerUnavailable);
-
+describe("Integration: FileSystem.rm", { skip }, () => {
   it("rm removes an existing file", async () => {
     const { transport, mux, session } = await createConnectedLowLevel();
     const filePath = testFilePath(`rm-${randomTestId()}.dat`);
@@ -150,9 +148,7 @@ describe("Integration: FileSystem.rm", () => {
   });
 });
 
-describe("Integration: FileSystem.mv", () => {
-  before(skipIfServerUnavailable);
-
+describe("Integration: FileSystem.mv", { skip }, () => {
   it("mv renames a file", async () => {
     const { transport, mux, session } = await createConnectedLowLevel();
     const srcPath = testFilePath(`mv-src-${randomTestId()}.dat`);
@@ -200,9 +196,7 @@ describe("Integration: FileSystem.mv", () => {
   });
 });
 
-describe("Integration: FileSystem.readdir edge cases", () => {
-  before(skipIfServerUnavailable);
-
+describe("Integration: FileSystem.readdir edge cases", { skip }, () => {
   it("readdir on non-existent path throws error", async () => {
     const { transport, mux, session } = await createConnectedLowLevel();
     try {

@@ -8,11 +8,15 @@ import { FileSystem } from "../../src/api/filesystem.ts";
 import { XRootDError } from "../../src/api/errors.ts";
 import { XRootDClient } from "../../src/client.ts";
 import {
-  skipIfServerUnavailable,
+  ifServerUnavailable,
   TEST_FILE_PATH,
   XROOTD_HOST,
   XROOTD_PORT,
 } from "./setup.ts";
+
+const skip = await ifServerUnavailable()
+  ? "SKIP: XRootD server not available"
+  : undefined;
 
 function withTimeout<T>(
   promise: Promise<T>,
@@ -54,9 +58,7 @@ async function createConnectedFileSystem(): Promise<{
   };
 }
 
-describe("Integration: FileSystem.stat", () => {
-  before(skipIfServerUnavailable);
-
+describe("Integration: FileSystem.stat", { skip }, () => {
   it("stat on existing file returns valid StatInfo", async () => {
     const { fs, close } = await createConnectedFileSystem();
     try {
@@ -98,9 +100,7 @@ describe("Integration: FileSystem.stat", () => {
   });
 });
 
-describe("Integration: FileSystem.readdir", () => {
-  before(skipIfServerUnavailable);
-
+describe("Integration: FileSystem.readdir", { skip }, () => {
   it("readdir on directory returns DirectoryList with entries", async () => {
     const { fs, close } = await createConnectedFileSystem();
     try {
@@ -132,9 +132,7 @@ describe("Integration: FileSystem.readdir", () => {
   });
 });
 
-describe("Integration: XRootDClient filesystem operations", () => {
-  before(skipIfServerUnavailable);
-
+describe("Integration: XRootDClient filesystem operations", { skip }, () => {
   it("client.statFilesystem returns valid info", async () => {
     const client = new XRootDClient(`root://${XROOTD_HOST}:${XROOTD_PORT}/`);
     try {
@@ -161,9 +159,7 @@ describe("Integration: XRootDClient filesystem operations", () => {
   });
 });
 
-describe("Integration: FileSystem.readdir entry fields", () => {
-  before(skipIfServerUnavailable);
-
+describe("Integration: FileSystem.readdir entry fields", { skip }, () => {
   it("readdir entries have correct types for all fields", async () => {
     const { fs, close } = await createConnectedFileSystem();
     try {
@@ -194,9 +190,7 @@ describe("Integration: FileSystem.readdir entry fields", () => {
   });
 });
 
-describe("Integration: FileSystem.stat on root", () => {
-  before(skipIfServerUnavailable);
-
+describe("Integration: FileSystem.stat on root", { skip }, () => {
   it("stat on /data returns valid directory info", async () => {
     const { fs, close } = await createConnectedFileSystem();
     try {

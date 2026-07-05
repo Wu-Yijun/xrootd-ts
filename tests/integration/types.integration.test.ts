@@ -20,16 +20,18 @@ import {
   closeLowLevel,
   createConnectedClient,
   createConnectedLowLevel,
+  ifServerUnavailable,
   SERVER_URL,
-  skipIfServerUnavailable,
   TEST_FILE_PATH,
   XROOTD_HOST,
   XROOTD_PORT,
 } from "./setup.ts";
 
-describe("Integration: StatInfo type validation", () => {
-  before(skipIfServerUnavailable);
+const skip = await ifServerUnavailable()
+  ? "SKIP: XRootD server not available"
+  : undefined;
 
+describe("Integration: StatInfo type validation", { skip }, () => {
   it("stat returns StatInfo with correct types for all fields", async () => {
     const client = await createConnectedClient();
     try {
@@ -117,9 +119,7 @@ describe("Integration: StatInfo type validation", () => {
   });
 });
 
-describe("Integration: DirectoryEntry type validation", () => {
-  before(skipIfServerUnavailable);
-
+describe("Integration: DirectoryEntry type validation", { skip }, () => {
   it("readdir entries have correct types", async () => {
     const client = await createConnectedClient();
     try {

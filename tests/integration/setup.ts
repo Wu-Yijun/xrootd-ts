@@ -2,7 +2,7 @@ import { createConnection } from "node:net";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { TestContext } from "node:test";
+import type { SuiteContext, TestContext } from "node:test";
 import { Transport } from "../../src/transport/transport.ts";
 import { Multiplexer } from "../../src/transport/multiplexer.ts";
 import { handshake } from "../../src/session/handshake.ts";
@@ -55,21 +55,10 @@ export function checkServerAvailable(): Promise<boolean> {
   });
 }
 
-export async function skipIfServerUnavailable(
-  ctx?: TestContext,
-): Promise<void> {
-  const available = await checkServerAvailable();
-  if (!available) {
-    console.log(
-      `  ⏭ Skipping: xrootd mock server not available at ${XROOTD_HOST}:${XROOTD_PORT}`,
-    );
-    console.log(`     Start it with: pnpm mock-server:up`);
-    if (ctx?.skip) {
-      ctx.skip();
-    } else if (typeof (this as any)?.skip === "function") {
-      (this as any).skip();
-    }
-  }
+let serverAvailable: boolean | undefined;
+export async function ifServerUnavailable(): Promise<boolean> {
+  serverAvailable ??= await checkServerAvailable();
+  return !serverAvailable;
 }
 
 // ── Shared connection helpers ──────────────────────────────────────────────

@@ -187,10 +187,11 @@ function createFileSystemServer(): Promise<
             const arg1len = message.readUInt16BE(18);
             const source = reqBody.subarray(0, arg1len).toString("utf8")
               .replace(/\0+$/, "");
-            const target = reqBody.subarray(arg1len + 1).toString("utf8").replace(
-              /\0+$/,
-              "",
-            );
+            const target = reqBody.subarray(arg1len + 1).toString("utf8")
+              .replace(
+                /\0+$/,
+                "",
+              );
 
             const srcParent = source.substring(0, source.lastIndexOf("/")) ||
               "/";

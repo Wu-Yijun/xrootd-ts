@@ -45,35 +45,30 @@ export class SecEnv {
   constructor(options: SecEnvOptions = {}) {
     const env = options.env ?? process.env;
 
-    this.protocolFilter =
-      options.protocolFilter ?? this.parseProtocolFilter(env);
+    this.protocolFilter = options.protocolFilter ??
+      this.parseProtocolFilter(env);
     this.proxyMode = truthy(env["XrdSecPROXY"]);
     this.proxyCreds = truthy(env["XrdSecPROXYCREDS"]);
 
-    this.sssKeytab =
-      options.sss !== false
-        ? (env["XrdSecSSSKT"] ?? env["XrdSecsssKT"])
-        : undefined;
+    this.sssKeytab = options.sss !== false
+      ? (env["XrdSecSSSKT"] ?? env["XrdSecsssKT"])
+      : undefined;
 
-    this.krb5InitToken =
-      options.krb5 !== false ? truthy(env["XrdSecKRB5INITTKN"]) : false;
+    this.krb5InitToken = options.krb5 !== false
+      ? truthy(env["XrdSecKRB5INITTKN"])
+      : false;
 
     if (options.gsi !== false) {
       const home = homedir();
-      this.gsiCaDir =
-        env["XrdSecGSICADIR"] ?? env["X509_CERT_DIR"] ??
+      this.gsiCaDir = env["XrdSecGSICADIR"] ?? env["X509_CERT_DIR"] ??
         "/etc/grid-security/certificates";
-      this.gsiCrlDir =
-        env["XrdSecGSICRLDIR"] ?? env["X509_CERT_DIR"] ??
+      this.gsiCrlDir = env["XrdSecGSICRLDIR"] ?? env["X509_CERT_DIR"] ??
         "/etc/grid-security/certificates";
-      this.gsiUserCert =
-        env["XrdSecGSIUSERCERT"] ?? env["X509_USER_CERT"] ??
+      this.gsiUserCert = env["XrdSecGSIUSERCERT"] ?? env["X509_USER_CERT"] ??
         `${home}/.globus/usercert.pem`;
-      this.gsiUserKey =
-        env["XrdSecGSIUSERKEY"] ?? env["X509_USER_KEY"] ??
+      this.gsiUserKey = env["XrdSecGSIUSERKEY"] ?? env["X509_USER_KEY"] ??
         `${home}/.globus/userkey.pem`;
-      this.gsiUserProxy =
-        env["XrdSecGSIUSERPROXY"] ?? env["X509_USER_PROXY"] ??
+      this.gsiUserProxy = env["XrdSecGSIUSERPROXY"] ?? env["X509_USER_PROXY"] ??
         `/tmp/x509up_u${process.getuid?.() ?? 0}`;
     } else {
       this.gsiCaDir = "";
@@ -83,8 +78,9 @@ export class SecEnv {
       this.gsiUserProxy = "";
     }
 
-    this.pwdServerPubkey =
-      options.pwd !== false ? env["XrdSecPWDSRVPUK"] : undefined;
+    this.pwdServerPubkey = options.pwd !== false
+      ? env["XrdSecPWDSRVPUK"]
+      : undefined;
 
     this.username = env["XrdSecUSER"];
     this.password = env["XrdSecCREDS"];

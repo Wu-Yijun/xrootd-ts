@@ -1,6 +1,6 @@
-import { describe, it, before, after } from "node:test";
+import { after, before, describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { writeFileSync, unlinkSync, mkdirSync } from "node:fs";
+import { mkdirSync, unlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { loadAuthConfig } from "./loader.ts";
