@@ -142,6 +142,7 @@ export class Multiplexer {
     const pending = this.pending.get(sid);
     if (pending) {
       pending.expiresAt = Date.now() + seconds * 1000 + this.timeout;
+      // globalThis.setTimeout(() => this.retryRequest(sid), seconds * 1000).unref();
       globalThis.setTimeout(() => this.retryRequest(sid), seconds * 1000);
     }
   }

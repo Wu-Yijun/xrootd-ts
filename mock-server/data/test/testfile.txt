@@ -1,5 +1,0 @@
-Hello, XRootD!
-This is a test file for the mock server.
-Line 3: Testing basic file operations.
-Line 4: Reading offset and size should work.
-Line 5: End of test file.

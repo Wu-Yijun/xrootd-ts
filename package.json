@@ -17,7 +17,7 @@
     "lint": "tsc --noEmit",
     "test": "node --experimental-strip-types --test src/**/*.test.ts",
     "test:e2e": "node --experimental-strip-types --test tests/e2e/**/*.test.ts",
-    "test:integration": "node --experimental-strip-types --test tests/integration/**/*.test.ts",
+    "test:integration": "node tests/integration/prepare.ts && node --experimental-strip-types --test tests/integration/**/*.test.ts",
     "test:all": "pnpm test && pnpm test:integration && pnpm test:e2e ",
     "mock-server:up": "docker compose up -d",
     "mock-server:down": "docker compose down",
