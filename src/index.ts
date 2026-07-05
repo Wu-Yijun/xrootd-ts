@@ -2,6 +2,12 @@
 export { XRootDClient } from "./client.ts";
 export type { XRootDClientOptions } from "./client.ts";
 
+// Config layer
+export { SecEnv } from "./config/sec-env.ts";
+export type { SecEnvOptions } from "./config/sec-env.ts";
+export { loadAuthConfig } from "./config/loader.ts";
+export type { AuthConfig } from "./config/loader.ts";
+
 // API layer
 export { File } from "./api/file.ts";
 export type { StatInfo } from "./api/types.ts";
