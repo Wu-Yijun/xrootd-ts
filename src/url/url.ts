@@ -1,76 +1,76 @@
-const DEFAULT_PORT = 1094
+const DEFAULT_PORT = 1094;
 
 export class XRootDUrl {
-  protocol: string
-  user?: string
-  password?: string
-  host: string
-  port: number
-  path: string
+  protocol: string;
+  user?: string;
+  password?: string;
+  host: string;
+  port: number;
+  path: string;
 
   constructor(url: string) {
-    const normalized = url.startsWith('root://') || url.startsWith('roots://')
+    const normalized = url.startsWith("root://") || url.startsWith("roots://")
       ? url
-      : `root://${url}`
+      : `root://${url}`;
 
-    const parsed = new URL(normalized)
+    const parsed = new URL(normalized);
 
-    const protocol = parsed.protocol.replace(/:$/, '')
-    if (protocol !== 'root' && protocol !== 'roots') {
-      throw new Error(`Invalid XRootD URL protocol: ${protocol}`)
+    const protocol = parsed.protocol.replace(/:$/, "");
+    if (protocol !== "root" && protocol !== "roots") {
+      throw new Error(`Invalid XRootD URL protocol: ${protocol}`);
     }
 
-    this.protocol = protocol
-    this.host = parsed.hostname
-    this.port = parsed.port ? parseInt(parsed.port, 10) : DEFAULT_PORT
-    this.path = parsed.pathname || '/'
-    this.user = parsed.username || undefined
-    this.password = parsed.password || undefined
+    this.protocol = protocol;
+    this.host = parsed.hostname;
+    this.port = parsed.port ? parseInt(parsed.port, 10) : DEFAULT_PORT;
+    this.path = parsed.pathname || "/";
+    this.user = parsed.username || undefined;
+    this.password = parsed.password || undefined;
   }
 
   static parse(url: string): XRootDUrl {
-    return new XRootDUrl(url)
+    return new XRootDUrl(url);
   }
 
   toString(): string {
-    let auth = ''
+    let auth = "";
     if (this.user) {
-      auth = this.user
+      auth = this.user;
       if (this.password) {
-        auth += ':' + this.password
+        auth += ":" + this.password;
       }
-      auth += '@'
+      auth += "@";
     }
 
-    const portStr = this.port === DEFAULT_PORT ? '' : `:${this.port}`
-    return `${this.protocol}://${auth}${this.host}${portStr}${this.path}`
+    const portStr = this.port === DEFAULT_PORT ? "" : `:${this.port}`;
+    return `${this.protocol}://${auth}${this.host}${portStr}${this.path}`;
   }
 
   isValid(): boolean {
-    return this.protocol === 'root' || this.protocol === 'roots'
+    return this.protocol === "root" || this.protocol === "roots";
   }
 
   isSecure(): boolean {
-    return this.protocol === 'roots'
+    return this.protocol === "roots";
   }
 
   getHostId(): string {
-    let auth = ''
+    let auth = "";
     if (this.user) {
-      auth = this.user
+      auth = this.user;
       if (this.password) {
-        auth += ':' + this.password
+        auth += ":" + this.password;
       }
-      auth += '@'
+      auth += "@";
     }
-    return `${auth}${this.host}:${this.port}`
+    return `${auth}${this.host}:${this.port}`;
   }
 
   getChannelId(): string {
-    return `${this.host}:${this.port}`
+    return `${this.host}:${this.port}`;
   }
 
   getLocation(): string {
-    return `${this.protocol}://${this.host}:${this.port}${this.path}`
+    return `${this.protocol}://${this.host}:${this.port}${this.path}`;
   }
 }

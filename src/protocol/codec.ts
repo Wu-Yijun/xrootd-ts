@@ -44,7 +44,7 @@ export function putString(
   str: string,
   maxLen: number,
 ): number {
-  const bytes = Buffer.from(str, 'utf8');
+  const bytes = Buffer.from(str, "utf8");
   const len = Math.min(bytes.length, maxLen);
   bytes.copy(buf, offset, 0, len);
   // zero-fill remainder
@@ -61,7 +61,7 @@ export function getString(
   offset: number,
   length: number,
 ): [string, number] {
-  const str = buf.toString('utf8', offset, offset + length).replace(/\0+$/, '');
+  const str = buf.toString("utf8", offset, offset + length).replace(/\0+$/, "");
   return [str, offset + length];
 }
 

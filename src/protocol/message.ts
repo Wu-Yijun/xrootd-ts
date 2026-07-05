@@ -1,21 +1,21 @@
 import {
-  PROTOCOL_VERSION,
+  HANDSHAKE_FIFTH,
   HANDSHAKE_FIRST,
+  HANDSHAKE_FOURTH,
   HANDSHAKE_SECOND,
   HANDSHAKE_THIRD,
-  HANDSHAKE_FOURTH,
-  HANDSHAKE_FIFTH,
+  PROTOCOL_VERSION,
   REQUEST_HDR_SIZE,
-} from './constants.ts';
+} from "./constants.ts";
 import {
+  get32,
+  getBytes,
+  getString,
   put16,
   put32,
-  putString,
   putBytes,
-  get32,
-  getString,
-  getBytes,
-} from './codec.ts';
+  putString,
+} from "./codec.ts";
 
 // ── Response interfaces ────────────────────────────────────────────────────
 
@@ -111,7 +111,7 @@ function streamIdToBytes(sid: number): Uint8Array {
 }
 
 function strToBytes(str: string): Uint8Array {
-  return Buffer.from(str, 'utf8');
+  return Buffer.from(str, "utf8");
 }
 
 // ── Request Builders ───────────────────────────────────────────────────────
@@ -764,13 +764,13 @@ export function parseDirlistResponse(body: Buffer): DirlistResponse {
   if (body.length === 0) return { entries };
 
   // Check if response contains metadata (has ':' after a null byte)
-  const hasMetadata = body.toString('utf8').includes('\0') &&
-    body.toString('utf8').includes(':');
+  const hasMetadata = body.toString("utf8").includes("\0") &&
+    body.toString("utf8").includes(":");
 
   if (hasMetadata) {
     // Format: name\0size:flags:mtime\n per entry
-    const text = body.toString('utf8');
-    const lines = text.split('\n').filter((l) => l.length > 0);
+    const text = body.toString("utf8");
+    const lines = text.split("\n").filter((l) => l.length > 0);
 
     for (const line of lines) {
       const nulIdx = line.indexOf(String.fromCharCode(0));
@@ -778,7 +778,7 @@ export function parseDirlistResponse(body: Buffer): DirlistResponse {
 
       const name = line.substring(0, nulIdx);
       const rest = line.substring(nulIdx + 1);
-      const fields = rest.split(':');
+      const fields = rest.split(":");
 
       if (fields.length >= 3) {
         entries.push({
@@ -791,8 +791,8 @@ export function parseDirlistResponse(body: Buffer): DirlistResponse {
     }
   } else {
     // Format: name\0name2\0name3 — null-separated names only
-    const text = body.toString('utf8');
-    const parts = text.split('\0');
+    const text = body.toString("utf8");
+    const parts = text.split("\0");
 
     for (const part of parts) {
       const name = part.trim();
