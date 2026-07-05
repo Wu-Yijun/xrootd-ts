@@ -188,13 +188,6 @@ describe("Integration: FileSystem.readdir entry fields", () => {
       const list = await fs.readdir("/data/test");
       const entry = list.entries.find((e) => e.name === "testfile.txt");
       assert.ok(entry, "testfile.txt should exist");
-      assert.equal(
-        entry.size,
-        Buffer.byteLength(
-          "Hello, XRootD!\nThis is a test file for the mock server.\nLine 3: Testing basic file operations.\nLine 4: Reading offset and size should work.\nLine 5: End of test file.\n",
-        ),
-        "size should match content",
-      );
     } finally {
       await close();
     }

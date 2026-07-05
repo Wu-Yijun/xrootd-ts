@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import type { XRootDUrl } from "../url/url.ts";
 import type { SecEnv } from "./sec-env.ts";
 
-export interface AuthConfig {
+export interface ResolvedAuthConfig {
   username?: string;
   password?: string;
   sssKey?: Buffer;
@@ -22,7 +22,7 @@ export function loadAuthConfig(options: {
   url?: XRootDUrl;
   credentials?: { username: string; password?: string };
   secEnv?: SecEnv;
-}): AuthConfig {
+}): ResolvedAuthConfig {
   const { url, credentials, secEnv } = options;
 
   const username =
