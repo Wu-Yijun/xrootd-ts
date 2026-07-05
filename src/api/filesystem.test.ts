@@ -80,15 +80,15 @@ describe("FileSystem", () => {
       const statPromise = fs.stat("/test/file.txt");
       await sleep(1);
 
-      // Real XRootD format: "id size ctime mtime atime crtime mode owner group"
+      // Real XRootD format: "id size flags mtime ctime atime mode owner group"
       const statBody = Buffer.from(
-        "12345 1024 1700000000 1700000000 1700000000 1700000000 100644 root root",
+        "12345 1024 0 1700000000 1700000001 1700000002 100644 root root",
       );
       transport.simulateResponse(0, statBody);
 
       const info = await statPromise;
-      assert.equal(info.id, 12345);
-      assert.equal(info.size, 1024);
+      assert.equal(info.id, "12345");
+      assert.equal(info.size, 1024n);
       assert.equal(info.mtime, 1700000000);
       assert.equal(info.isDirectory, false);
     });
@@ -99,7 +99,7 @@ describe("FileSystem", () => {
 
       // mode 040755 = directory with rwxrwxr-x
       const statBody = Buffer.from(
-        "12345 4096 1700000000 1700000000 1700000000 1700000000 040755 root root",
+        "12345 4096 2 1700000000 1700000001 1700000002 040755 root root",
       );
       transport.simulateResponse(0, statBody);
 
