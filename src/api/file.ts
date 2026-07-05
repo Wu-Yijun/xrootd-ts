@@ -11,7 +11,7 @@ import {
   parseErrorResponse,
   parseOpenResponse,
 } from "../protocol/message.ts";
-import { ResponseStatus } from "../protocol/constants.ts";
+import { OpenFlags, ResponseStatus, ServerError } from "../protocol/constants.ts";
 import { XRootDError } from "./errors.ts";
 import { type StatInfo, createStatInfo } from "./types.ts";
 
@@ -35,10 +35,10 @@ export class File {
     options?: { flags?: number; mode?: number },
   ): Promise<void> {
     if (this._isOpen) {
-      throw new XRootDError(3004, "File is already open");
+      throw new XRootDError(ServerError.FileNotOpen, "File is already open");
     }
 
-    const flags = options?.flags ?? 0x0010; // kXR_open_read
+    const flags = options?.flags ?? OpenFlags.Read;
     const mode = options?.mode ?? 0;
 
     const buf = buildOpenRequest(0, path, flags, mode);
@@ -57,14 +57,14 @@ export class File {
     }
 
     throw new XRootDError(
-      3012,
+      ServerError.ServerError,
       `Unexpected open response status: ${frame.status}`,
     );
   }
 
   async read(offset: number, size: number): Promise<Uint8Array> {
     if (!this._isOpen || !this.fhandle) {
-      throw new XRootDError(3004, "File is not open");
+      throw new XRootDError(ServerError.FileNotOpen, "File is not open");
     }
 
     const buf = buildReadRequest(0, this.fhandle, offset, size);
@@ -80,14 +80,14 @@ export class File {
     }
 
     throw new XRootDError(
-      3012,
+      ServerError.ServerError,
       `Unexpected read response status: ${frame.status}`,
     );
   }
 
   async write(offset: number, data: Uint8Array): Promise<number> {
     if (!this._isOpen || !this.fhandle) {
-      throw new XRootDError(3004, "File is not open");
+      throw new XRootDError(ServerError.FileNotOpen, "File is not open");
     }
 
     const buf = buildWriteRequest(0, this.fhandle, offset, data);
@@ -103,7 +103,7 @@ export class File {
     }
 
     throw new XRootDError(
-      3012,
+      ServerError.ServerError,
       `Unexpected write response status: ${frame.status}`,
     );
   }
@@ -127,7 +127,7 @@ export class File {
 
   async stat(): Promise<StatInfo> {
     if (!this._isOpen || !this.fhandle) {
-      throw new XRootDError(3004, "File is not open");
+      throw new XRootDError(ServerError.FileNotOpen, "File is not open");
     }
 
     const buf = buildStatRequest(0, "", this.fhandle);
@@ -143,14 +143,14 @@ export class File {
     }
 
     throw new XRootDError(
-      3012,
+      ServerError.ServerError,
       `Unexpected stat response status: ${frame.status}`,
     );
   }
 
   async sync(): Promise<void> {
     if (!this._isOpen || !this.fhandle) {
-      throw new XRootDError(3004, "File is not open");
+      throw new XRootDError(ServerError.FileNotOpen, "File is not open");
     }
 
     const buf = buildSyncRequest(0, this.fhandle);
@@ -164,7 +164,7 @@ export class File {
 
   async truncate(size: number): Promise<void> {
     if (!this._isOpen || !this.fhandle) {
-      throw new XRootDError(3004, "File is not open");
+      throw new XRootDError(ServerError.FileNotOpen, "File is not open");
     }
 
     const buf = buildTruncateRequest(0, this.fhandle, size);
