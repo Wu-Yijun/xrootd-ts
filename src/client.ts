@@ -3,8 +3,10 @@ import { Transport } from './transport/transport.ts'
 import { Multiplexer } from './transport/multiplexer.ts'
 import { handshake } from './session/handshake.ts'
 import { File } from './api/file.ts'
+import { FileSystem } from './api/filesystem.ts'
 import type { Session } from './session/handshake.ts'
 import type { StatInfo } from './api/file.ts'
+import type { DirectoryList } from './api/types.ts'
 import { XRootDError } from './api/errors.ts'
 import { RequestId } from './protocol/constants.ts'
 import { buildEndsessRequest } from './protocol/message.ts'
@@ -24,6 +26,7 @@ export class XRootDClient {
   private transport: Transport | null = null
   private mux: Multiplexer | null = null
   private session: Session | null = null
+  private fs: FileSystem | null = null
 
   constructor(url: string, options: XRootDClientOptions = {}) {
     this.url = XRootDUrl.parse(url)
@@ -50,6 +53,7 @@ export class XRootDClient {
     this.session = await handshake(this.mux, url, {
       username: this.options.credentials?.username,
     })
+    this.fs = new FileSystem(this.mux)
   }
 
   private async handleRedirect(host: string, port: number): Promise<void> {
@@ -102,6 +106,48 @@ export class XRootDClient {
     }
   }
 
+  async statFilesystem(path: string): Promise<StatInfo> {
+    if (!this.fs) {
+      throw new XRootDError(311, 'Client not connected')
+    }
+    return this.fs.stat(path)
+  }
+
+  async readdir(path: string): Promise<DirectoryList> {
+    if (!this.fs) {
+      throw new XRootDError(311, 'Client not connected')
+    }
+    return this.fs.readdir(path)
+  }
+
+  async mkdir(path: string, mode?: number): Promise<void> {
+    if (!this.fs) {
+      throw new XRootDError(311, 'Client not connected')
+    }
+    return this.fs.mkdir(path, mode)
+  }
+
+  async rmdir(path: string): Promise<void> {
+    if (!this.fs) {
+      throw new XRootDError(311, 'Client not connected')
+    }
+    return this.fs.rmdir(path)
+  }
+
+  async rm(path: string): Promise<void> {
+    if (!this.fs) {
+      throw new XRootDError(311, 'Client not connected')
+    }
+    return this.fs.rm(path)
+  }
+
+  async mv(source: string, target: string): Promise<void> {
+    if (!this.fs) {
+      throw new XRootDError(311, 'Client not connected')
+    }
+    return this.fs.mv(source, target)
+  }
+
   async close(): Promise<void> {
     if (this.mux) {
       this.mux.close()
@@ -114,6 +160,7 @@ export class XRootDClient {
     }
 
     this.session = null
+    this.fs = null
   }
 
   get isConnected(): boolean {

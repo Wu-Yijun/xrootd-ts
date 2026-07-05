@@ -5,6 +5,7 @@ export type { XRootDClientOptions } from './client.ts'
 // API layer
 export { File } from './api/file.ts'
 export type { StatInfo } from './api/file.ts'
+export { FileSystem } from './api/filesystem.ts'
 export { XRootDError } from './api/errors.ts'
 export type {
   OpenOptions,
@@ -13,7 +14,9 @@ export type {
   LocationInfo,
   DirectoryListInfo,
   DirectoryList,
+  DirectoryEntry,
   ProtocolInfo,
+  AuthConfig,
 } from './api/types.ts'
 
 // Transport layer
