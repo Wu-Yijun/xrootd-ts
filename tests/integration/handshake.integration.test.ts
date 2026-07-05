@@ -20,7 +20,7 @@ function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise
 }
 
 describe('Integration: handshake', () => {
-  before(async function () {
+  before(async function (this: { skip?: () => void }) {
     await skipIfServerUnavailable.call(this)
   })
 

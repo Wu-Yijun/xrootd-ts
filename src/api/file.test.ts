@@ -44,6 +44,8 @@ class MockTransportForFile implements ITransport {
     this.dataCallback = callback
   }
 
+  removeDataHandler(_callback: (chunk: Buffer) => void): void {}
+
   onClose(callback: () => void): void {
     this.closeCallback = callback
   }

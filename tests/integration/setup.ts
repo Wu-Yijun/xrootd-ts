@@ -25,7 +25,7 @@ export function checkServerAvailable(): Promise<boolean> {
   })
 }
 
-export async function skipIfServerUnavailable(this: any): Promise<void> {
+export async function skipIfServerUnavailable(this: { skip?: () => void }): Promise<void> {
   const available = await checkServerAvailable()
   if (!available) {
     console.log(`  ⏭ Skipping: xrootd mock server not available at ${XROOTD_HOST}:${XROOTD_PORT}`)

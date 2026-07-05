@@ -42,7 +42,7 @@ async function createConnectedClient(): Promise<{
 }
 
 describe('Integration: file read flow', () => {
-  before(async function () {
+  before(async function (this: { skip?: () => void }) {
     await skipIfServerUnavailable.call(this)
   })
 
