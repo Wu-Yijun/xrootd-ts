@@ -14,16 +14,7 @@ import { RequestId, ResponseStatus } from "../protocol/constants.ts";
 import { XRootDError } from "./errors.ts";
 import type { DirectoryList, StatInfo } from "./types.ts";
 import { createStatInfo } from "./types.ts";
-
-function extractBody(buf: Buffer): Uint8Array {
-  return new Uint8Array(buf.subarray(4, 20));
-}
-
-function extractExtraData(buf: Buffer): Uint8Array | undefined {
-  const dlen = buf.readUInt32BE(20);
-  if (dlen === 0) return undefined;
-  return new Uint8Array(buf.subarray(24, 24 + dlen));
-}
+import { extractBody, extractExtraData } from "../utils/request.ts";
 
 export class FileSystem {
   private mux: Multiplexer;

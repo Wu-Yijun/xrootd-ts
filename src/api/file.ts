@@ -18,6 +18,7 @@ import {
 } from "../protocol/constants.ts";
 import { XRootDError } from "./errors.ts";
 import { createStatInfo, type StatInfo } from "./types.ts";
+import { sendRequest } from "../utils/request.ts";
 
 export class File {
   private mux: Multiplexer;
@@ -179,19 +180,6 @@ export class File {
       throw new XRootDError(errnum, errmsg);
     }
   }
-}
-
-async function sendRequest(
-  mux: Multiplexer,
-  buf: Buffer,
-  data?: Uint8Array,
-) {
-  const requestId = buf.readUInt16BE(2);
-  const body = new Uint8Array(buf.subarray(4, 20));
-  const dlen = buf.readUInt32BE(20);
-  const extraData = data ??
-    (dlen > 0 ? new Uint8Array(buf.subarray(24, 24 + dlen)) : undefined);
-  return mux.request(requestId, body, extraData);
 }
 
 function parseStatInfo(body: Buffer): StatInfo {
