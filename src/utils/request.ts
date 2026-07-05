@@ -4,27 +4,32 @@
 
 import type { Frame } from "../transport/framer.ts";
 import type { Multiplexer } from "../transport/multiplexer.ts";
+import {
+  REQUEST_OFFSET_BODY,
+  REQUEST_OFFSET_DLEN,
+  REQUEST_OFFSET_REQUEST_ID,
+} from "../protocol/constants.ts";
 
-/** Extract the 16-byte request body from offset 4-20. */
+/** Extract the 16-byte request body. */
 export function extractBody(buf: Buffer): Uint8Array {
-  return new Uint8Array(buf.subarray(4, 20));
+  return new Uint8Array(buf.subarray(REQUEST_OFFSET_BODY, REQUEST_OFFSET_BODY + 16));
 }
 
-/** Extract extra data from offset 24+ based on dlen at offset 20. */
+/** Extract extra data based on dlen. */
 export function extractExtraData(buf: Buffer): Uint8Array | undefined {
-  const dlen = buf.readUInt32BE(20);
+  const dlen = extractDataLength(buf);
   if (dlen === 0) return undefined;
-  return new Uint8Array(buf.subarray(24, 24 + dlen));
+  return new Uint8Array(buf.subarray(REQUEST_OFFSET_DLEN + 4, REQUEST_OFFSET_DLEN + 4 + dlen));
 }
 
-/** Extract the request ID (uint16 BE) at offset 2. */
+/** Extract the request ID (uint16 BE). */
 export function extractRequestId(buf: Buffer): number {
-  return buf.readUInt16BE(2);
+  return buf.readUInt16BE(REQUEST_OFFSET_REQUEST_ID);
 }
 
-/** Extract the data length (uint32 BE) at offset 20. */
+/** Extract the data length (uint32 BE). */
 export function extractDataLength(buf: Buffer): number {
-  return buf.readUInt32BE(20);
+  return buf.readUInt32BE(REQUEST_OFFSET_DLEN);
 }
 
 /**
@@ -40,6 +45,6 @@ export async function sendRequest(
   const body = extractBody(buf);
   const dlen = extractDataLength(buf);
   const extraData = data ??
-    (dlen > 0 ? new Uint8Array(buf.subarray(24, 24 + dlen)) : undefined);
+    (dlen > 0 ? new Uint8Array(buf.subarray(REQUEST_OFFSET_DLEN + 4, REQUEST_OFFSET_DLEN + 4 + dlen)) : undefined);
   return mux.request(requestId, body, extraData);
 }

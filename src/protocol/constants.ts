@@ -149,6 +149,18 @@ export const BODY_SIZE = 16;
 export const SESS_ID_SIZE = 16;
 export const FHANDLE_SIZE = 4;
 
+// ── Request header field offsets ──────────────────────────────────────────
+export const REQUEST_OFFSET_STREAM_ID = 0;
+export const REQUEST_OFFSET_REQUEST_ID = 2;
+export const REQUEST_OFFSET_BODY = 4;
+export const REQUEST_OFFSET_DLEN = 20;
+
+// ── Response header field offsets ─────────────────────────────────────────
+export const RESPONSE_OFFSET_STREAM_ID = 0;
+export const RESPONSE_OFFSET_STATUS = 2;
+export const RESPONSE_OFFSET_DLEN = 4;
+export const RESPONSE_OFFSET_BODY = 8;
+
 // ── ClientInitHandShake constants ──────────────────────────────────────────
 export const HANDSHAKE_FIRST = 0;
 export const HANDSHAKE_SECOND = 0;
