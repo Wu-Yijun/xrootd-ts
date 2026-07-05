@@ -80,7 +80,10 @@ export class File {
       throw new XRootDError(errnum, errmsg);
     }
 
-    if (frame.status === ResponseStatus.Ok) {
+    if (
+      frame.status === ResponseStatus.Ok ||
+      frame.status === ResponseStatus.Oksofar
+    ) {
       return new Uint8Array(frame.body);
     }
 
