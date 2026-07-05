@@ -66,30 +66,19 @@ jobs:
       - name: Start XRootD Local Server
         run: |
           # Starting XRootD Local Server...
-
-          # Use the existing mock-server config, but override export path for CI
-          # (Docker mounts ./mock-server/data as /data; CI has no Docker)
-          WORKSPACE="$(pwd)"
-          sed \
-            -e "s|all.export /data|all.export ${WORKSPACE}/mock-server/data|" \
-            -e "s|all.adminpath /var/spool/xrootd|all.adminpath ${WORKSPACE}/xrootd-admin|" \
-            -e "s|all.pidpath /run/xrootd|all.pidpath ${WORKSPACE}/xrootd-admin|" \
-            mock-server/config/xrootd-standalone.cfg > xrootd-test.cfg
-
-          mkdir -p xrootd-admin
-
           # 检查当前是否为 root 用户 (UID=0)
           if [ "$(id -u)" = "0" ]; then
             echo "Detected root user (Container environment). Dropping privileges..."
             
             # 1. 放开当前测试目录的权限，否则降权后的用户无法读写测试文件和日志
-            chmod -R 777 .
+            chmod -R 777 mock-server
             
             # 2. 切换到系统内置的非特权用户 (daemon) 来在后台启动 xrootd
-            su -s /bin/sh daemon -c "nohup xrootd -c xrootd-test.cfg -p 1094 > xrootd-server.log 2>&1 &"
+            # 注意：$(pwd) 会在当前 root 的 shell 展开，以绝对路径传递给 daemon
+            su -s /bin/sh daemon -c "nohup xrootd -p 1094 '$(pwd)/mock-server' > xrootd-server.log 2>&1 &"
           else
             echo "Detected non-root user (macOS environment). Running directly..."
-            nohup xrootd -c xrootd-test.cfg -p 1094 > xrootd-server.log 2>&1 &
+            nohup xrootd -p 1094 "$(pwd)/mock-server" > xrootd-server.log 2>&1 &
           fi
 
           echo "Sleeping 10 seconds...."
@@ -106,9 +95,9 @@ jobs:
           # 移交文件所有权
           if [ "$(id -u)" = "0" ]; then
             # 确保后续你的测试脚本 (root 身份) 跑完后，还有权限去清理或读取这些文件
-            chmod -R 777 tests/tmp
+            chmod -R 777 mock-server/data
             # 把测试目录的所有权移交给 daemon 用户和组
-            chown -R daemon:daemon tests/tmp
+            chown -R daemon:daemon mock-server/data
           fi
           # 等待 xrootd 启动完成
           node scripts/wait-for-xrootd.ts
