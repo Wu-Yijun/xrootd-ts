@@ -49,7 +49,7 @@ export async function handshake(
 
   const handshakeBuf = buildHandshakeAndProtocol(0, flags, kXR_ExpLogin);
 
-  const transport = (mux as unknown as { transport: ITransport }).transport;
+  const transport = mux.getTransport();
 
   // Register the frame reader BEFORE sending to avoid a race condition:
   // the server may respond before waitForFrame() would register its handler,

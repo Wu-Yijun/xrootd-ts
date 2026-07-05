@@ -203,6 +203,10 @@ export class Multiplexer {
     this.redirectCount = 0;
   }
 
+  getTransport(): ITransport {
+    return this.transport;
+  }
+
   close(): void {
     if (this.closed) return;
     this.closed = true;
