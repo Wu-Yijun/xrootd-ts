@@ -181,7 +181,7 @@ describe('Auth Framework', () => {
       sessid: new Uint8Array(16),
     }
 
-    const responsePromise = doAuthentication(mux, 'multiround', params)
+    const responsePromise = doAuthentication(mux, 'sss', params)
 
     await sleep(1)
     // First authmore
@@ -194,11 +194,11 @@ describe('Auth Framework', () => {
     transport.simulateResponse(0, Buffer.alloc(0))
 
     const entity = await responsePromise
-    assert.equal(entity.prot, 'multiround')
+    assert.equal(entity.prot, 'sss')
   })
 
   it('throws on auth failure', async () => {
-    registerAuthProtocol('fail', () => new MockAuthProtocol(new Uint8Array([0x01])))
+    registerAuthProtocol('host', () => new MockAuthProtocol(new Uint8Array([0x01])))
 
     const params: AuthParams = {
       host: 'localhost',
@@ -207,7 +207,7 @@ describe('Auth Framework', () => {
       sessid: new Uint8Array(16),
     }
 
-    const responsePromise = doAuthentication(mux, 'fail', params)
+    const responsePromise = doAuthentication(mux, 'host', params)
 
     await sleep(1)
     // Send error response
