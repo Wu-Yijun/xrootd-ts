@@ -5,10 +5,10 @@ import { handshake } from "./session/handshake.ts";
 import { File } from "./api/file.ts";
 import { FileSystem } from "./api/filesystem.ts";
 import type { Session } from "./session/handshake.ts";
-import type { StatInfo } from "./api/file.ts";
+import type { StatInfo } from "./api/types.ts";
 import type { DirectoryList } from "./api/types.ts";
 import { XRootDError } from "./api/errors.ts";
-import { RequestId } from "./protocol/constants.ts";
+import { ClientError, OpenFlags, RequestId } from "./protocol/constants.ts";
 import { buildEndsessRequest } from "./protocol/message.ts";
 
 export interface XRootDClientOptions {
@@ -87,7 +87,7 @@ export class XRootDClient {
     options?: { flags?: number; mode?: number },
   ): Promise<File> {
     if (!this.mux || !this.session) {
-      throw new XRootDError(311, "Client not connected");
+      throw new XRootDError(ClientError.Uninitialized, "Client not connected");
     }
 
     const file = new File(this.mux, this.session);
@@ -97,11 +97,11 @@ export class XRootDClient {
 
   async stat(path: string): Promise<StatInfo> {
     if (!this.mux || !this.session) {
-      throw new XRootDError(311, "Client not connected");
+      throw new XRootDError(ClientError.Uninitialized, "Client not connected");
     }
 
     const file = new File(this.mux, this.session);
-    await file.open(path, { flags: 0x0010 });
+    await file.open(path, { flags: OpenFlags.Read });
     try {
       return await file.stat();
     } finally {
@@ -111,42 +111,42 @@ export class XRootDClient {
 
   async statFilesystem(path: string): Promise<StatInfo> {
     if (!this.fs) {
-      throw new XRootDError(311, "Client not connected");
+      throw new XRootDError(ClientError.Uninitialized, "Client not connected");
     }
     return this.fs.stat(path);
   }
 
   async readdir(path: string): Promise<DirectoryList> {
     if (!this.fs) {
-      throw new XRootDError(311, "Client not connected");
+      throw new XRootDError(ClientError.Uninitialized, "Client not connected");
     }
     return this.fs.readdir(path);
   }
 
   async mkdir(path: string, mode?: number): Promise<void> {
     if (!this.fs) {
-      throw new XRootDError(311, "Client not connected");
+      throw new XRootDError(ClientError.Uninitialized, "Client not connected");
     }
     return this.fs.mkdir(path, mode);
   }
 
   async rmdir(path: string): Promise<void> {
     if (!this.fs) {
-      throw new XRootDError(311, "Client not connected");
+      throw new XRootDError(ClientError.Uninitialized, "Client not connected");
     }
     return this.fs.rmdir(path);
   }
 
   async rm(path: string): Promise<void> {
     if (!this.fs) {
-      throw new XRootDError(311, "Client not connected");
+      throw new XRootDError(ClientError.Uninitialized, "Client not connected");
     }
     return this.fs.rm(path);
   }
 
   async mv(source: string, target: string): Promise<void> {
     if (!this.fs) {
-      throw new XRootDError(311, "Client not connected");
+      throw new XRootDError(ClientError.Uninitialized, "Client not connected");
     }
     return this.fs.mv(source, target);
   }
