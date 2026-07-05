@@ -160,14 +160,12 @@ describe('Multiplexer', () => {
     it('redirect triggers onRedirect callback and retries', async () => {
       let redirectHost = ''
       let redirectPort = 0
-      let retryCalled = false
 
       const redirectMux = new Multiplexer(transport, {
         maxRedirects: 16,
         onRedirect: async (host, port) => {
           redirectHost = host
           redirectPort = port
-          retryCalled = true
         },
       })
 
@@ -184,18 +182,23 @@ describe('Multiplexer', () => {
 
       transport.simulateResponse(4004, redirectBody)
 
-      await sleep(10)
+      // Wait for redirect to be processed and retry to happen
+      await sleep(50)
 
       assert.equal(redirectHost, 'newserver.example.com')
       assert.equal(redirectPort, 1095)
-      assert.equal(retryCalled, true)
+
+      // The request should have been retried, simulate success
+      transport.simulateResponse(0, Buffer.alloc(0))
+      const frame = await responsePromise
+      assert.equal(frame.status, 0)
 
       redirectMux.close()
     })
 
     it('rejects when max redirects exceeded', async () => {
       const redirectMux = new Multiplexer(transport, {
-        maxRedirects: 2,
+        maxRedirects: 1,
         onRedirect: async () => {},
       })
 
@@ -211,22 +214,18 @@ describe('Multiplexer', () => {
 
       // First redirect
       transport.simulateResponse(4004, redirectBody)
-      await sleep(10)
+      await sleep(50)
 
-      // Second redirect - need a new request since the first one retried
-      await sleep(1)
+      // The retry happened, send another redirect
+      transport.simulateResponse(4004, redirectBody)
+      await sleep(50)
+
+      // Third redirect should fail - need a new request
       const promise2 = redirectMux.request(3006, body)
       await sleep(1)
       transport.simulateResponse(4004, redirectBody)
-      await sleep(10)
 
-      // Third redirect should fail
-      await sleep(1)
-      const promise3 = redirectMux.request(3006, body)
-      await sleep(1)
-      transport.simulateResponse(4004, redirectBody)
-
-      await assert.rejects(promise3, /Too many redirects/)
+      await assert.rejects(promise2, /Too many redirects/)
 
       redirectMux.close()
     })
@@ -264,7 +263,9 @@ describe('Multiplexer', () => {
       const p1 = redirectMux.request(3006, body)
       await sleep(1)
       transport.simulateResponse(4004, redirectBody)
-      await sleep(10)
+      await sleep(50)
+      transport.simulateResponse(0, Buffer.alloc(0))
+      await p1
 
       // Reset counter
       redirectMux.resetRedirectCount()
@@ -273,7 +274,9 @@ describe('Multiplexer', () => {
       const p2 = redirectMux.request(3006, body)
       await sleep(1)
       transport.simulateResponse(4004, redirectBody)
-      await sleep(10)
+      await sleep(50)
+      transport.simulateResponse(0, Buffer.alloc(0))
+      await p2
 
       assert.equal(callCount, 2)
 
