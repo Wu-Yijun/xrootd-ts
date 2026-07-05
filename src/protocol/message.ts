@@ -755,22 +755,22 @@ export interface DirlistResponse {
  * Parse kXR_dirlist response body.
  *
  * Each entry format: `name\0size:flags:mtime\n`
- * Entries are NUL-separated; last entry has no trailing NUL.
+ * Entries are separated by newlines; name and metadata separated by NUL.
  */
 export function parseDirlistResponse(body: Buffer): DirlistResponse {
   const text = body.toString('utf8');
   const entries: DirectoryEntry[] = [];
 
-  // Split by NUL or newline, filter empty
-  const parts = text.split(/\0/).filter((p) => p.trim().length > 0);
+  // Split by newline, filter empty lines
+  const lines = text.split('\n').filter((l) => l.length > 0);
 
-  for (const part of parts) {
-    // Each part: "name:size:flags:mtime"
-    const colonIdx = part.indexOf(':');
-    if (colonIdx === -1) continue;
+  for (const line of lines) {
+    // Each line: "name\0size:flags:mtime"
+    const nulIdx = line.indexOf(String.fromCharCode(0));
+    if (nulIdx === -1) continue;
 
-    const name = part.substring(0, colonIdx);
-    const rest = part.substring(colonIdx + 1);
+    const name = line.substring(0, nulIdx);
+    const rest = line.substring(nulIdx + 1);
     const fields = rest.split(':');
 
     if (fields.length >= 3) {
