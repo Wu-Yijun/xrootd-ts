@@ -15,6 +15,7 @@ import {
   parseLoginResponse,
   parseProtocolResponse,
   parseRedirectResponse,
+  parseSecToken,
 } from "../protocol/message.ts";
 import { createFrameReader } from "../utils/frame-reader.ts";
 import { XRootDError } from "../api/errors.ts";
@@ -23,9 +24,15 @@ import type { SecEntity } from "../security/interface.ts";
 export interface Session {
   sessid: Uint8Array;
   protocolVersion: number;
-  secReqs?: string;
+  /** Security level from protocol response secReqs struct. */
+  seclvl?: number;
+  /** Bind preferences from protocol response bifReqs struct. */
   bifReqs?: string;
   secEntity?: SecEntity;
+  /** Auth protocol names parsed from login response secToken. */
+  authProtocols?: string[];
+  /** Whether the server sent a secToken in login response (auth required). */
+  needsAuth: boolean;
 }
 
 /**
@@ -120,8 +127,10 @@ export async function handshake(
     return {
       sessid: loginResp.sessid,
       protocolVersion: protoResp.pval,
-      secReqs: protoResp.secReqs,
+      seclvl: protoResp.seclvl,
       bifReqs: protoResp.bifReqs,
+      authProtocols: loginResp.secToken ? parseSecToken(loginResp.secToken) : undefined,
+      needsAuth: loginResp.needsAuth,
     };
   } finally {
     reader.close();
