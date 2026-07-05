@@ -3,6 +3,7 @@ import { type Frame, Framer } from "./framer.ts";
 import { Message } from "../protocol/message.ts";
 import { ResponseStatus } from "../protocol/constants.ts";
 import { parseRedirectResponse } from "../protocol/message.ts";
+import { streamIdToBytes, bytesToStreamId } from "../utils/bytes.ts";
 
 interface PendingRequest {
   resolve: (frame: Frame) => void;
@@ -89,7 +90,7 @@ export class Multiplexer {
     Buffer.from(body).copy(bodyBuf);
 
     const msg = new Message(24 + (data?.length ?? 0));
-    msg.writeBytes(new Uint8Array([(sid >> 8) & 0xff, sid & 0xff]));
+    msg.writeBytes(streamIdToBytes(sid));
     msg.writeInt16BE(requestId);
     msg.writeBytes(bodyBuf);
     msg.writeInt32BE(data?.length ?? 0);
@@ -111,7 +112,7 @@ export class Multiplexer {
   }
 
   private handleFrame(frame: Frame): void {
-    const sid = (frame.streamId[0] << 8) | frame.streamId[1];
+    const sid = bytesToStreamId(frame.streamId);
 
     if (frame.status === ResponseStatus.Wait) {
       const seconds = frame.body.readInt32BE(0);

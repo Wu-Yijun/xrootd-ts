@@ -12,6 +12,7 @@ import {
 } from "./constants.ts";
 import { get32, getBytes, getString } from "./codec.ts";
 import { Message } from "./message-class.ts";
+import { streamIdToBytes, strToBytes } from "../utils/bytes.ts";
 
 // ── Response interfaces ────────────────────────────────────────────────────
 
@@ -50,16 +51,6 @@ export interface WaitResponse {
 }
 
 // ── Message class ──────────────────────────────────────────────────────────
-
-// ── Helpers ────────────────────────────────────────────────────────────────
-
-function streamIdToBytes(sid: number): Uint8Array {
-  return new Uint8Array([(sid >> 8) & 0xff, sid & 0xff]);
-}
-
-function strToBytes(str: string): Uint8Array {
-  return Buffer.from(str, "utf8");
-}
 
 // ── Request Builders ───────────────────────────────────────────────────────
 
