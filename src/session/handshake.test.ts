@@ -73,6 +73,21 @@ function makeLoginResponseFrame(): Buffer {
   return buildResponseFrame(0, 0, body)
 }
 
+function makeErrorResponseFrame(streamId: number, errnum: number, errmsg: string): Buffer {
+  const errBody = Buffer.alloc(4 + errmsg.length + 1)
+  errBody.writeUInt32BE(errnum, 0)
+  Buffer.from(errmsg, 'utf8').copy(errBody, 4)
+  errBody[4 + errmsg.length] = 0
+  return buildResponseFrame(streamId, 4003, errBody)
+}
+
+function makeRedirectResponseFrame(streamId: number, port: number, host: string): Buffer {
+  const body = Buffer.alloc(4 + host.length)
+  body.writeInt32BE(port, 0)
+  Buffer.from(host, 'utf8').copy(body, 4)
+  return buildResponseFrame(streamId, 4004, body)
+}
+
 describe('handshake', () => {
   it('returns Session with correct sessid and protocolVersion', async () => {
     const transport = new MockTransportForHandshake()
@@ -171,6 +186,83 @@ describe('handshake', () => {
     assert.equal(loginSend.readUInt32BE(4), 42)   // pid
     const username = loginSend.toString('utf8', 8, 16).replace(/\0+$/, '')
     assert.equal(username, 'alice')
+
+    mux.close()
+  })
+
+  it('throws on protocol error response', async () => {
+    const transport = new MockTransportForHandshake()
+    const mux = new Multiplexer(transport as any)
+    const url = new XRootDUrl('root://host.cern.ch/data')
+
+    const sessionPromise = handshake(mux, url)
+
+    await new Promise(r => setTimeout(r, 10))
+
+    transport.emit(makeServerInitFrame())
+
+    await new Promise(r => setTimeout(r, 10))
+
+    transport.emit(makeErrorResponseFrame(0, 3006, 'protocol not supported'))
+
+    await assert.rejects(
+      sessionPromise,
+      (err: any) => err.message.includes('Protocol handshake error'),
+    )
+
+    mux.close()
+  })
+
+  it('throws on login error response', async () => {
+    const transport = new MockTransportForHandshake()
+    const mux = new Multiplexer(transport as any)
+    const url = new XRootDUrl('root://host.cern.ch/data')
+
+    const sessionPromise = handshake(mux, url)
+
+    await new Promise(r => setTimeout(r, 10))
+
+    transport.emit(makeServerInitFrame())
+
+    await new Promise(r => setTimeout(r, 10))
+
+    transport.emit(makeProtocolResponseFrame())
+
+    await new Promise(r => setTimeout(r, 10))
+
+    transport.emit(makeErrorResponseFrame(0, 3010, 'not authorized'))
+
+    await assert.rejects(
+      sessionPromise,
+      (err: any) => err.message.includes('Login error'),
+    )
+
+    mux.close()
+  })
+
+  it('throws on login redirect response', async () => {
+    const transport = new MockTransportForHandshake()
+    const mux = new Multiplexer(transport as any)
+    const url = new XRootDUrl('root://host.cern.ch/data')
+
+    const sessionPromise = handshake(mux, url)
+
+    await new Promise(r => setTimeout(r, 10))
+
+    transport.emit(makeServerInitFrame())
+
+    await new Promise(r => setTimeout(r, 10))
+
+    transport.emit(makeProtocolResponseFrame())
+
+    await new Promise(r => setTimeout(r, 10))
+
+    transport.emit(makeRedirectResponseFrame(0, 1095, 'other.server.com'))
+
+    await assert.rejects(
+      sessionPromise,
+      (err: any) => err.message.includes('redirect'),
+    )
 
     mux.close()
   })

@@ -128,6 +128,23 @@ describe('Multiplexer', () => {
     assert.equal(frame.status, 0)
   })
 
+  it('kXR_waitresp (4006) triggers retry', async () => {
+    mux.setTimeout(10000)
+    const body = new Uint8Array(16)
+    const responsePromise = mux.request(3006, body)
+
+    await sleep(1)
+    const waitBody = Buffer.alloc(4)
+    waitBody.writeInt32BE(2, 0)
+    transport.simulateResponse(4006, waitBody)
+
+    await sleep(2100)
+    transport.simulateResponse(0, Buffer.alloc(0))
+
+    const frame = await responsePromise
+    assert.equal(frame.status, 0)
+  })
+
   it('timeout rejects pending request', async () => {
     mux.setTimeout(100)
     const body = new Uint8Array(16)

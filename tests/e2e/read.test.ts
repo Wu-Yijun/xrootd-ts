@@ -4,6 +4,8 @@ import net from 'node:net'
 import { Transport } from '../../src/transport/transport.ts'
 import { Multiplexer } from '../../src/transport/multiplexer.ts'
 import { File } from '../../src/api/file.ts'
+import { handshake } from '../../src/session/handshake.ts'
+import { XRootDUrl } from '../../src/url/url.ts'
 import type { Session } from '../../src/session/handshake.ts'
 
 function buildResponseFrame(streamId: number, status: number, body: Buffer): Buffer {
@@ -120,5 +122,37 @@ async function runE2ETest() {
 describe('E2E: read flow', () => {
   it('completes login → open → read → close', async () => {
     await runE2ETest()
+  })
+
+  it('completes handshake() → open → read → close', async () => {
+    const { server, port } = await createSimulatedServer()
+
+    try {
+      const transport = new Transport()
+      await transport.connect('127.0.0.1', port)
+      const mux = new Multiplexer(transport)
+
+      const url = new XRootDUrl(`root://127.0.0.1:${port}/`)
+      const session = await handshake(mux, url)
+
+      assert.ok(session.sessid.length === 16, 'sessid should be 16 bytes')
+      assert.ok(session.protocolVersion > 0, 'protocolVersion should be positive')
+
+      const file = new File(mux, session)
+      await file.open('/data/test.txt', { flags: 0x0010 })
+      assert.equal(file.isOpen, true)
+
+      const data = await file.read(0, 100)
+      const text = new TextDecoder().decode(data)
+      assert.equal(text, 'Hello, XRootD!')
+
+      await file.close()
+      assert.equal(file.isOpen, false)
+
+      mux.close()
+      await transport.close()
+    } finally {
+      server.close()
+    }
   })
 })
