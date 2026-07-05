@@ -185,6 +185,15 @@ export const DEFAULT_PORT = 1094;
 export const S_IFDIR = 0o040000;
 export const S_IFLNK = 0o120000;
 
+// ── Dirlist Options (kXR_dirlist options field) ────────────────────────────
+export const DirlistOptions = {
+  Online: 1,
+  Dstat: 2,
+  Dcksm: 4,
+  Dstatx: 8,
+} as const;
+export type DirlistOptions = typeof DirlistOptions[keyof typeof DirlistOptions];
+
 // ── Authentication credential types ─────────────────────────────────────
 export const CRED_TYPE: Record<string, number> = {
   host: 0,
