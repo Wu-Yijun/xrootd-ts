@@ -36,16 +36,9 @@ export interface LocationInfo {
   get isRedirect(): boolean;
 }
 
-export interface DirectoryListInfo {
-  name: string;
-  size: number;
-  mtime: number;
-  flags: number;
-}
-
 export interface DirectoryList {
   name: string;
-  entries: DirectoryListInfo[];
+  entries: DirectoryEntry[];
 }
 
 export interface ProtocolInfo {

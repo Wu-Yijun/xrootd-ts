@@ -740,12 +740,7 @@ export function buildEndsessRequest(
 
 // ── Phase 2 Response Parsers ───────────────────────────────────────────────
 
-export interface DirectoryEntry {
-  name: string;
-  size: number;
-  flags: number;
-  mtime: number;
-}
+import type { DirectoryEntry } from "../api/types.ts";
 
 export interface DirlistResponse {
   entries: DirectoryEntry[];

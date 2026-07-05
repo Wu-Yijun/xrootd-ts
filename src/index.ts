@@ -12,7 +12,6 @@ export type {
   ChunkInfo,
   DirectoryEntry,
   DirectoryList,
-  DirectoryListInfo,
   Location,
   LocationInfo,
   OpenOptions,
