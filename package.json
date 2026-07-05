@@ -1,6 +1,6 @@
 {
   "name": "xrootd",
-  "version": "1.0.0-beta.1",
+  "version": "1.0.0-beta.2",
   "description": "A TypeScript client library for the XRootD protocol",
   "main": "dist/index.mjs",
   "types": "dist/index.d.mts",
@@ -11,7 +11,6 @@
     }
   },
   "scripts": {
-    "preinstall": "npx only-allow pnpm",
     "build": "tsdown",
     "dev": "tsdown --watch",
     "typecheck": "tsc --noEmit",
