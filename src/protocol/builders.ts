@@ -401,7 +401,10 @@ export function buildMvRequest(
 ): Buffer {
   const srcBytes = strToBytes(source);
   const tgtBytes = strToBytes(target);
-  const msg = new Message(REQUEST_HDR_SIZE + srcBytes.length + tgtBytes.length);
+  const spaceSep = new Uint8Array([0x20]); // SPACE separator
+  const msg = new Message(
+    REQUEST_HDR_SIZE + srcBytes.length + 1 + tgtBytes.length,
+  );
 
   msg.writeBytes(streamIdToBytes(streamId));
   msg.writeInt16BE(RequestId.Mv);
@@ -409,9 +412,10 @@ export function buildMvRequest(
   msg.writeBytes(new Uint8Array(14));
   msg.writeInt16BE(srcBytes.length & 0xffff);
 
-  msg.writeInt32BE(srcBytes.length + tgtBytes.length);
+  msg.writeInt32BE(srcBytes.length + 1 + tgtBytes.length);
 
   msg.writeBytes(srcBytes);
+  msg.writeBytes(spaceSep);
   msg.writeBytes(tgtBytes);
 
   return msg.getBuffer();
