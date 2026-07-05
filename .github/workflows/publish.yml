@@ -1,0 +1,57 @@
+name: Publish to npm
+
+# 触发条件：当你真正在 GitHub 上发布一个 Release 时触发
+on:
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: tick to publish to npm
+        required: true
+        type: boolean
+        default: false
+  release:
+    types: [published]
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@f808768d1510423e83855289c910610ca9b43176 # v2.17.0
+        with:
+          egress-policy: audit
+
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          version: 11.5.2
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          registry-url: "https://registry.npmjs.org"
+          cache: "pnpm"
+          node-version: 26.1.0
+
+      - name: Install dependencies
+        run: |
+          pnpm config set minimumReleaseAge 3000 --global
+          pnpm install --frozen-lockfile
+
+      - name: Build package (For testing)
+        run: pnpm run build
+
+      - name: Run tests
+        run: pnpm run test:all
+
+      - name: Publish package
+        if: ${{ github.event_name == 'release' && github.event.action == 'published' || github.event_name == 'workflow_dispatch' && github.event.inputs.publish == 'true' }}
+        run: npm publish --provenance --access public

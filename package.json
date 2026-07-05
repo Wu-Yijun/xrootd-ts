@@ -1,13 +1,13 @@
 {
   "name": "xrootd",
-  "version": "0.1.0",
+  "version": "1.0.0-beta.1",
   "description": "A TypeScript client library for the XRootD protocol",
-  "main": "dist/index.js",
-  "types": "dist/index.d.ts",
+  "main": "dist/index.mjs",
+  "types": "dist/index.d.mts",
   "exports": {
     ".": {
-      "types": "./dist/index.d.ts",
-      "import": "./dist/index.js"
+      "types": "./dist/index.d.mts",
+      "import": "./dist/index.mjs"
     }
   },
   "scripts": {
@@ -28,16 +28,18 @@
   "keywords": [
     "xrootd",
     "xroot",
+    "eos",
+    "client",
     "high-energy-physics",
     "data-transfer",
     "storage",
     "protocol"
   ],
-  "author": "",
+  "author": "Aluria",
   "homepage": "https://github.com/Wu-Yijun/xrootd-ts",
   "repository": {
     "type": "git",
-    "url": "https://github.com/Wu-Yijun/xrootd-ts.git"
+    "url": "git+https://github.com/Wu-Yijun/xrootd-ts.git"
   },
   "bugs": {
     "url": "https://github.com/Wu-Yijun/xrootd-ts/issues"
@@ -49,7 +51,8 @@
     "node": ">=22"
   },
   "files": [
-    "dist",
+    "dist/index.mjs",
+    "dist/index.d.mts",
     "LICENSE",
     "README.md",
     "CHANGELOG.md"

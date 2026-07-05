@@ -4,6 +4,10 @@ A TypeScript client library for the [XRootD](https://xrootd.org) protocol.
 
 XRootD (eXtended ROOT Daemon) is a high-performance, fault-tolerant protocol for accessing and managing large-scale distributed storage systems. It is widely used in High Energy Physics (HEP) for data access at facilities like CERN's LHC experiments.
 
+> **🚀 v2.0.0 is Here: A Modern, Native Rewrite!**
+> ⚠️ **Breaking Changes**: Because of the fundamental architecture shift, **v2 is not API-compatible with v1**.
+> Please read our [Migration Guide (MIGRATING.md)](MIGRATING.md) to upgrade.
+
 ## Installation
 
 ```sh
@@ -13,7 +17,7 @@ npm install xrootd
 ## Quick Start
 
 ```ts
-import { XRootDClient } from 'xrootd'
+import { XRootDClient, OpenFlags } from 'xrootd'
 
 const client = new XRootDClient('root://server.example.com')
 await client.connect()
@@ -29,18 +33,12 @@ const file = await client.open('/data/file.dat')
 const data = await file.read(0, 1024)
 await file.close()
 
+// Write a file
+const file2 = await client.open('/data/output.dat', { flags: OpenFlags.Write | OpenFlags.New })
+await file2.write(0, new Uint8Array([72, 101, 108, 108, 111]))
+await file2.close()
+
 await client.close()
-```
-
-```ts
-import { File, OpenFlags } from 'xrootd'
-
-// Low-level API: open and read a file directly
-const file = new File('root://server.example.com//data/file.dat')
-await file.open({ flags: OpenFlags.Read })
-const data = await file.read(0, 1024)
-await file.close()
-console.log(data) // Uint8Array
 ```
 
 ## API
@@ -50,7 +48,7 @@ console.log(data) // Uint8Array
 High-level client that manages connection, authentication, and automatic redirect handling.
 
 ```ts
-import { XRootDClient } from 'xrootd'
+import { XRootDClient, OpenFlags } from 'xrootd'
 
 const client = new XRootDClient('root://server.example.com', {
   credentials: { username: 'user', password: 'pass' },
@@ -59,6 +57,10 @@ const client = new XRootDClient('root://server.example.com', {
 })
 
 await client.connect()
+
+// Connection state
+console.log(client.isConnected)  // boolean
+console.log(client.location)     // "root://server.example.com:1094/"
 
 // File operations
 const file = await client.open('/data/file.dat', { flags: OpenFlags.Read })
@@ -72,8 +74,9 @@ await client.mv('/old/path', '/new/path')
 await client.rm('/old/file')
 await client.rmdir('/old/dir')
 
-// Metadata
-const info = await client.stat('/data/file.dat')
+// Metadata — two approaches
+const info1 = await client.stat('/data/file.dat')          // opens + stats + closes
+const info2 = await client.statFilesystem('/data/file.dat') // filesystem protocol, no file open
 
 await client.close()
 ```
@@ -82,12 +85,11 @@ await client.close()
 
 File operations for reading, writing, and managing files on XRootD servers.
 
-```ts
-const file = new File('root://server//path/to/file')
+Obtained via `client.open()` — do not construct directly.
 
-// Open — two signatures
-await file.open({ flags: OpenFlags.Read })
-await file.open('root://server//other/file', { flags: OpenFlags.Write })
+```ts
+// Open a file
+const file = await client.open('/data/file.dat', { flags: OpenFlags.Read })
 
 // Core operations
 const data: Uint8Array = await file.read(offset, size)
@@ -96,24 +98,6 @@ const info: StatInfo = await file.stat()
 await file.sync()
 await file.truncate(size)
 await file.close()
-
-// Automatic resource cleanup (recommended)
-await using file = new File('root://server//path/to/file')
-await file.open({ flags: OpenFlags.Read })
-const buf = await file.read(0, 1024)
-// Automatically closes when leaving scope
-```
-
-#### Vector I/O
-
-Batch multiple read/write operations in a single network round-trip:
-
-```ts
-const chunks = [
-  { fhandle, offset: 0, rlen: 1024 },
-  { fhandle, offset: 4096, rlen: 2048 },
-]
-const results = await file.vectorRead(chunks)
 ```
 
 ### FileSystem
@@ -123,7 +107,8 @@ Stateless filesystem metadata operations:
 ```ts
 import { FileSystem } from 'xrootd'
 
-const fs = new FileSystem('root://server')
+// Obtained internally by XRootDClient; shown here for reference
+const fs = new FileSystem(mux)
 
 // Metadata
 const info = await fs.stat('/data/file.dat')
@@ -132,13 +117,9 @@ console.log(info.size, info.mtime, info.isDirectory)
 // Directory operations
 await fs.mkdir('/new/dir')
 const list = await fs.readdir('/data')
-await fs.rename('/old/path', '/new/path')
+await fs.mv('/old/path', '/new/path')
 await fs.rm('/old/file')
 await fs.rmdir('/old/dir')
-
-// Queries
-const stats = await fs.query('stats')
-await fs.ping()
 ```
 
 ### Authentication
@@ -184,13 +165,18 @@ When connecting to a server that requires authentication, the client will automa
 All errors are thrown as `XRootDError` instances:
 
 ```ts
-import { XRootDError } from 'xrootd'
+import { XRootDClient, OpenFlags, XRootDError } from 'xrootd'
+
+const client = new XRootDClient('root://server.example.com')
+await client.connect()
 
 try {
-  await file.open('root://server//nonexistent', { flags: OpenFlags.Read })
+  const file = await client.open('/nonexistent', { flags: OpenFlags.Read })
+  await file.read(0, 1024)
+  await file.close()
 } catch (err) {
   if (err instanceof XRootDError) {
-    console.log(err.code)     // 3011 (kXR_NotFound)
+    console.log(err.code)     // 3011 (NotFound)
     console.log(err.message)  // "File not found"
     console.log(err.errno)    // POSIX errno (if applicable)
   }
@@ -219,29 +205,76 @@ try {
 
 ```ts
 interface StatInfo {
-  id: number
-  size: number
-  mtime: number
-  flags: number
+  id: string        // opaque device id (string to avoid precision loss)
+  size: bigint      // file size in bytes (bigint for >4GB files)
+  flags: number     // XRootD server flags
+  mtime: number     // modification time (epoch seconds)
+  ctime: number     // change time (epoch seconds)
+  atime: number     // access time (epoch seconds)
+  mode: number      // POSIX mode (e.g. 0o100644)
+  owner: string     // file owner
+  group: string     // file group
   get isDirectory(): boolean
   get isLink(): boolean
   get isOffline(): boolean
   get isCached(): boolean
 }
 
+interface DirectoryEntry {
+  name: string
+  size: number
+  flags: number
+  mtime: number
+}
+
 interface DirectoryList {
   name: string
-  entries: DirectoryListInfo[]
+  entries: DirectoryEntry[]
 }
 
 const enum OpenFlags {
-  Read     = 0x0010,
-  Write    = 0x0020,
-  Append   = 0x0200,
-  New      = 0x0008,
-  Delete   = 0x0002,
-  Mkpath   = 0x0100,
-  Replica  = 0x0800,
+  Compress  = 0x0001,
+  Delete    = 0x0002,
+  Force     = 0x0004,
+  New       = 0x0008,
+  Read      = 0x0010,
+  Write     = 0x0020,
+  Async     = 0x0040,
+  Refresh   = 0x0080,
+  Mkpath    = 0x0100,
+  Append    = 0x0200,
+  Retstat   = 0x0400,
+  Replica   = 0x0800,
+  Posc      = 0x1000,
+  Nowait    = 0x2000,
+  Seqio     = 0x4000,
+  Wrto      = 0x8000,
+}
+```
+
+#### OpenOptions
+
+```ts
+interface OpenOptions {
+  flags?: OpenFlags   // file open flags (default: OpenFlags.Read)
+  mode?: number       // POSIX mode (default: 0)
+  signal?: AbortSignal  // cancellation signal
+}
+```
+
+#### StatFlags
+
+```ts
+const StatFlags = {
+  XBitSet: 1,
+  IsDir: 2,
+  Other: 4,
+  Offline: 8,
+  Readable: 16,
+  Writable: 32,
+  POSCPending: 64,
+  BackUpExists: 128,
+  CacheResp: 512,
 }
 ```
 
