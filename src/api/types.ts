@@ -75,7 +75,7 @@ export function createStatInfo(data: string): StatInfo {
     owner,
     group,
     get isDirectory() {
-      return (mode & S_IFDIR) !== 0;
+      return (serverFlags & StatFlags.IsDir) !== 0;
     },
     get isLink() {
       return (mode & S_IFLNK) === S_IFLNK;
