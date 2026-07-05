@@ -44,6 +44,9 @@ describe("XRootDError", () => {
 
   it("unknown code returns default message", () => {
     assert.equal(XRootDError.codeToMessage(9999), "Unknown error (9999)");
-    assert.equal(XRootDError.codeToMessage(0), "Unknown error (0)");
+  });
+
+  it("known ClientError codes have messages", () => {
+    assert.equal(XRootDError.codeToMessage(0), "OK");
   });
 });
