@@ -118,60 +118,13 @@ export class Multiplexer {
   private handleFrame(frame: Frame): void {
     const sid = bytesToStreamId(frame.streamId);
 
-    if (frame.status === ResponseStatus.Wait) {
-      const seconds = frame.body.readInt32BE(0);
-      const pending = this.pending.get(sid);
-      if (pending) {
-        pending.expiresAt = Date.now() + seconds * 1000 + this.timeout;
-        globalThis.setTimeout(() => this.retryRequest(sid), seconds * 1000);
-      }
-      return;
-    }
-
-    if (frame.status === ResponseStatus.Waitresp) {
-      const seconds = frame.body.readInt32BE(0);
-      const pending = this.pending.get(sid);
-      if (pending) {
-        pending.expiresAt = Date.now() + seconds * 1000 + this.timeout;
-        globalThis.setTimeout(() => this.retryRequest(sid), seconds * 1000);
-      }
+    if (frame.status === ResponseStatus.Wait || frame.status === ResponseStatus.Waitresp) {
+      this.handleWaitResponse(sid, frame);
       return;
     }
 
     if (frame.status === ResponseStatus.Redirect) {
-      const pending = this.pending.get(sid);
-      if (!pending) return;
-
-      if (this.redirectCount >= this.maxRedirects) {
-        this.pending.delete(sid);
-        pending.reject(
-          new Error(
-            `Too many redirects (max ${this.maxRedirects})`,
-          ),
-        );
-        return;
-      }
-
-      this.redirectCount++;
-      const { host, port } = parseRedirectResponse(frame.body);
-
-      if (this.onRedirect) {
-        this.onRedirect(host, port)
-          .then(() => {
-            this.retryRequest(sid);
-          })
-          .catch((err) => {
-            this.pending.delete(sid);
-            pending.reject(err);
-          });
-      } else {
-        this.pending.delete(sid);
-        pending.reject(
-          new Error(
-            `Redirect to ${host}:${port} but no onRedirect handler configured`,
-          ),
-        );
-      }
+      this.handleRedirectResponse(sid, frame);
       return;
     }
 
@@ -179,6 +132,51 @@ export class Multiplexer {
     if (!pending) return;
     this.pending.delete(sid);
     pending.resolve(frame);
+  }
+
+  private handleWaitResponse(sid: number, frame: Frame): void {
+    const seconds = frame.body.readInt32BE(0);
+    const pending = this.pending.get(sid);
+    if (pending) {
+      pending.expiresAt = Date.now() + seconds * 1000 + this.timeout;
+      globalThis.setTimeout(() => this.retryRequest(sid), seconds * 1000);
+    }
+  }
+
+  private handleRedirectResponse(sid: number, frame: Frame): void {
+    const pending = this.pending.get(sid);
+    if (!pending) return;
+
+    if (this.redirectCount >= this.maxRedirects) {
+      this.pending.delete(sid);
+      pending.reject(
+        new Error(
+          `Too many redirects (max ${this.maxRedirects})`,
+        ),
+      );
+      return;
+    }
+
+    this.redirectCount++;
+    const { host, port } = parseRedirectResponse(frame.body);
+
+    if (this.onRedirect) {
+      this.onRedirect(host, port)
+        .then(() => {
+          this.retryRequest(sid);
+        })
+        .catch((err) => {
+          this.pending.delete(sid);
+          pending.reject(err);
+        });
+    } else {
+      this.pending.delete(sid);
+      pending.reject(
+        new Error(
+          `Redirect to ${host}:${port} but no onRedirect handler configured`,
+        ),
+      );
+    }
   }
 
   private retryRequest(sid: number): void {
