@@ -179,7 +179,9 @@ async function sendRequest(
 ) {
   const requestId = buf.readUInt16BE(2)
   const body = new Uint8Array(buf.subarray(4, 20))
-  return mux.request(requestId, body, data)
+  const dlen = buf.readUInt32BE(20)
+  const extraData = data ?? (dlen > 0 ? new Uint8Array(buf.subarray(24, 24 + dlen)) : undefined)
+  return mux.request(requestId, body, extraData)
 }
 
 function parseStatInfo(body: Buffer): StatInfo {

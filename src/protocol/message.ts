@@ -754,32 +754,56 @@ export interface DirlistResponse {
 /**
  * Parse kXR_dirlist response body.
  *
- * Each entry format: `name\0size:flags:mtime\n`
- * Entries are separated by newlines; name and metadata separated by NUL.
+ * Two possible formats depending on options:
+ * 1. Names-only (kXR_online, default): `name\0name2\0name3\0` — null-separated
+ * 2. With stat info (kXR_dstat): `name\0size:flags:mtime\n` — newline-separated
  */
 export function parseDirlistResponse(body: Buffer): DirlistResponse {
-  const text = body.toString('utf8');
   const entries: DirectoryEntry[] = [];
 
-  // Split by newline, filter empty lines
-  const lines = text.split('\n').filter((l) => l.length > 0);
+  if (body.length === 0) return { entries };
 
-  for (const line of lines) {
-    // Each line: "name\0size:flags:mtime"
-    const nulIdx = line.indexOf(String.fromCharCode(0));
-    if (nulIdx === -1) continue;
+  // Check if response contains metadata (has ':' after a null byte)
+  const hasMetadata = body.toString('utf8').includes('\0') &&
+    body.toString('utf8').includes(':');
 
-    const name = line.substring(0, nulIdx);
-    const rest = line.substring(nulIdx + 1);
-    const fields = rest.split(':');
+  if (hasMetadata) {
+    // Format: name\0size:flags:mtime\n per entry
+    const text = body.toString('utf8');
+    const lines = text.split('\n').filter((l) => l.length > 0);
 
-    if (fields.length >= 3) {
-      entries.push({
-        name,
-        size: parseInt(fields[0], 10) || 0,
-        flags: parseInt(fields[1], 10) || 0,
-        mtime: parseInt(fields[2], 10) || 0,
-      });
+    for (const line of lines) {
+      const nulIdx = line.indexOf(String.fromCharCode(0));
+      if (nulIdx === -1) continue;
+
+      const name = line.substring(0, nulIdx);
+      const rest = line.substring(nulIdx + 1);
+      const fields = rest.split(':');
+
+      if (fields.length >= 3) {
+        entries.push({
+          name,
+          size: parseInt(fields[0], 10) || 0,
+          flags: parseInt(fields[1], 10) || 0,
+          mtime: parseInt(fields[2], 10) || 0,
+        });
+      }
+    }
+  } else {
+    // Format: name\0name2\0name3 — null-separated names only
+    const text = body.toString('utf8');
+    const parts = text.split('\0');
+
+    for (const part of parts) {
+      const name = part.trim();
+      if (name.length > 0) {
+        entries.push({
+          name,
+          size: 0,
+          flags: 0,
+          mtime: 0,
+        });
+      }
     }
   }
 

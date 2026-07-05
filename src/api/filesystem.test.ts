@@ -76,8 +76,8 @@ describe('FileSystem', () => {
       const statPromise = fs.stat('/test/file.txt')
       await sleep(1)
 
-      // Simulate stat response: "12345 1024 1700000000 0"
-      const statBody = Buffer.from('12345 1024 1700000000 0')
+      // Real XRootD format: "id size mtime ctime flags" (5 fields)
+      const statBody = Buffer.from('12345 1024 1700000000 0 0')
       transport.simulateResponse(0, statBody)
 
       const info = await statPromise
@@ -93,7 +93,7 @@ describe('FileSystem', () => {
       await sleep(1)
 
       // flags 0x1000 = isDirectory
-      const statBody = Buffer.from('12345 0 1700000000 4096')
+      const statBody = Buffer.from('12345 0 1700000000 0 4096')
       transport.simulateResponse(0, statBody)
 
       const info = await statPromise

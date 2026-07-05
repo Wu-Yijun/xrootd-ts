@@ -18,18 +18,18 @@ function createStatInfo(data: string): StatInfo {
   const parts = data.trim().split(/\s+/)
   const id = parseInt(parts[0], 10) || 0
   const size = parseInt(parts[1], 10) || 0
-  const mtime = parseInt(parts[2], 10) || 0
-  const flags = parseInt(parts[3], 10) || 0
+  const mtime = parseInt(parts[3], 10) || 0
+  const flags = parseInt(parts[4] ?? '0', 10) || 0
 
   return {
     id,
     size,
     mtime,
     flags,
-    get isDirectory() { return (flags & 0x1000) !== 0 },
-    get isLink() { return (flags & 0x2000) !== 0 },
-    get isOffline() { return (flags & 0x4000) !== 0 },
-    get isCached() { return (flags & 0x8000) !== 0 },
+    get isDirectory() { return (flags & 0x4000) !== 0 },
+    get isLink() { return (flags & 0x8000) !== 0 },
+    get isOffline() { return (flags & 0x10000) !== 0 },
+    get isCached() { return (flags & 0x20000) !== 0 },
   }
 }
 
