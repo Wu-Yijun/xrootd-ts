@@ -20,6 +20,15 @@ function pkcs5Pad(data: Buffer, blockSize: number): Buffer {
   return padded
 }
 
+/**
+ * SSS (Simple Shared Secret) authentication protocol.
+ *
+ * Uses Blowfish-ECB encryption + CRC32 checksum.
+ * Note: Requires Node.js with legacy OpenSSL provider for Blowfish support.
+ * Run with: NODE_OPTIONS=--openssl-legacy-provider
+ *
+ * Or use the static create() method which checks if Blowfish is available.
+ */
 export class SSSAuth implements SecurityProtocol {
   readonly name = 'sss'
   private entity: SecEntity = { prot: 'sss', uid: 0, gid: 0 }
@@ -31,6 +40,16 @@ export class SSSAuth implements SecurityProtocol {
       throw new Error('SSS key must be 8 bytes')
     }
     this.key = key
+  }
+
+  static isSupported(): boolean {
+    try {
+      const cipher = createCipheriv('bf-ecb', Buffer.alloc(8), null)
+      cipher.final()
+      return true
+    } catch {
+      return false
+    }
   }
 
   async getCredentials(params: AuthParams): Promise<Uint8Array> {
