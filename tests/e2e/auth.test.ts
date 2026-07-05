@@ -35,9 +35,13 @@ function createAuthServer(
     credType: number,
     credData: Buffer,
   ) => { ok: boolean; msg?: string },
-): Promise<{ server: net.Server; port: number }> {
+): Promise<{ server: net.Server; port: number; close: () => void }> {
   return new Promise((resolve) => {
+    const sockets = new Set<net.Socket>();
     const server = net.createServer((socket) => {
+      sockets.add(socket);
+      socket.on("close", () => sockets.delete(socket));
+
       let buffer = Buffer.alloc(0);
 
       socket.on("data", (chunk: Buffer) => {
@@ -79,8 +83,8 @@ function createAuthServer(
             body.writeUInt32BE(0x09, 4);
             socket.write(buildResponseFrame(streamId, 0, body));
           } else if (requestId === 3007) {
-            // kXR_login - send sessid[16] + secToken
-            const secToken = Buffer.from(secReqs + "\0");
+            // kXR_login - send sessid[16] + secToken in &P= format
+            const secToken = Buffer.from("&P=" + secReqs + "\0");
             const body = Buffer.alloc(16 + secToken.length);
             for (let i = 0; i < 16; i++) body[i] = i + 1;
             secToken.copy(body, 16);
@@ -116,14 +120,18 @@ function createAuthServer(
 
     server.listen(0, "127.0.0.1", () => {
       const addr = server.address() as net.AddressInfo;
-      resolve({ server, port: addr.port });
+      const close = () => {
+        for (const s of sockets) s.destroy();
+        server.close();
+      };
+      resolve({ server, port: addr.port, close });
     });
   });
 }
 
 describe("E2E: host authentication", () => {
   it("authenticates with host protocol", async () => {
-    const { server, port } = await createAuthServer(
+    const { server, port, close } = await createAuthServer(
       "host",
       (credType, credData) => {
         // host auth sends hostname as credentials
@@ -152,12 +160,12 @@ describe("E2E: host authentication", () => {
       mux.close();
       await transport.close();
     } finally {
-      server.close();
+      close();
     }
   });
 
   it("auth failure sets needsAuth but does not throw", async () => {
-    const { server, port } = await createAuthServer("host", () => {
+    const { port, close } = await createAuthServer("host", () => {
       return { ok: false, msg: "Host not trusted" };
     });
 
@@ -176,14 +184,14 @@ describe("E2E: host authentication", () => {
       mux.close();
       await transport.close();
     } finally {
-      server.close();
+      close();
     }
   });
 });
 
 describe("E2E: unsupported auth protocol", () => {
   it("returns session with authProtocols when no supported protocol", async () => {
-    const { server, port } = await createAuthServer("krb5");
+    const { port, close } = await createAuthServer("krb5");
 
     try {
       const transport = new Transport();
@@ -198,7 +206,7 @@ describe("E2E: unsupported auth protocol", () => {
       mux.close();
       await transport.close();
     } finally {
-      server.close();
+      close();
     }
   });
 });
