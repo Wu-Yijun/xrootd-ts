@@ -76,15 +76,14 @@ describe('FileSystem', () => {
       const statPromise = fs.stat('/test/file.txt')
       await sleep(1)
 
-      // Real XRootD format: "id size mtime ctime flags" (5 fields)
-      const statBody = Buffer.from('12345 1024 1700000000 0 0')
+      // Real XRootD format: "id size ctime mtime atime crtime mode owner group"
+      const statBody = Buffer.from('12345 1024 1700000000 1700000000 1700000000 1700000000 100644 root root')
       transport.simulateResponse(0, statBody)
 
       const info = await statPromise
       assert.equal(info.id, 12345)
       assert.equal(info.size, 1024)
       assert.equal(info.mtime, 1700000000)
-      assert.equal(info.flags, 0)
       assert.equal(info.isDirectory, false)
     })
 
@@ -92,8 +91,8 @@ describe('FileSystem', () => {
       const statPromise = fs.stat('/test/dir')
       await sleep(1)
 
-      // flags 0x1000 = isDirectory
-      const statBody = Buffer.from('12345 0 1700000000 0 4096')
+      // mode 040755 = directory with rwxrwxr-x
+      const statBody = Buffer.from('12345 4096 1700000000 1700000000 1700000000 1700000000 040755 root root')
       transport.simulateResponse(0, statBody)
 
       const info = await statPromise

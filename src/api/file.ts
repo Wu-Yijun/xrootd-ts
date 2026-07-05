@@ -188,24 +188,25 @@ function parseStatInfo(body: Buffer): StatInfo {
   const text = body.toString('utf-8').trim()
   const parts = text.split(/\s+/)
 
-  const flags = parseInt(parts[4] ?? '0', 10) || 0
+  const modeStr = parts[6] ?? '0'
+  const mode = parseInt(modeStr, 8) || 0
 
   const info: StatInfo = {
     id: parseInt(parts[0] ?? '0', 10) || 0,
     size: parseInt(parts[1] ?? '0', 10) || 0,
     mtime: parseInt(parts[3] ?? '0', 10) || 0,
-    flags,
+    flags: mode,
     get isDirectory() {
-      return (this.flags & 0x4000) !== 0
+      return (mode & 0o040000) !== 0
     },
     get isLink() {
-      return (this.flags & 0x8000) !== 0
+      return (mode & 0o120000) === 0o120000
     },
     get isOffline() {
-      return (this.flags & 0x10000) !== 0
+      return false
     },
     get isCached() {
-      return (this.flags & 0x20000) !== 0
+      return false
     },
   }
 

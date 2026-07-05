@@ -19,17 +19,19 @@ function createStatInfo(data: string): StatInfo {
   const id = parseInt(parts[0], 10) || 0
   const size = parseInt(parts[1], 10) || 0
   const mtime = parseInt(parts[3], 10) || 0
-  const flags = parseInt(parts[4] ?? '0', 10) || 0
+  const modeStr = parts[6] ?? '0'
+  const mode = parseInt(modeStr, 8) || 0
+  const flags = mode
 
   return {
     id,
     size,
     mtime,
     flags,
-    get isDirectory() { return (flags & 0x4000) !== 0 },
-    get isLink() { return (flags & 0x8000) !== 0 },
-    get isOffline() { return (flags & 0x10000) !== 0 },
-    get isCached() { return (flags & 0x20000) !== 0 },
+    get isDirectory() { return (mode & 0o040000) !== 0 },
+    get isLink() { return (mode & 0o120000) === 0o120000 },
+    get isOffline() { return false },
+    get isCached() { return false },
   }
 }
 
