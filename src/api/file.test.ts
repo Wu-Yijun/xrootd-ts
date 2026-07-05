@@ -128,7 +128,7 @@ describe("File", () => {
     transport.enqueueResponse(0, Buffer.alloc(0));
 
     const written = await file.write(0, writeData);
-    assert.equal(written, 0);
+    assert.equal(written, 5);
 
     const writeReq = transport.sentData[transport.sentData.length - 1];
     assert.equal(writeReq.readUInt16BE(2), 3019); // kXR_write
