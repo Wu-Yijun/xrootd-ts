@@ -48,12 +48,8 @@ export class File {
     const flags = options?.flags ?? 0x0010 // kXR_open_read
     const mode = options?.mode ?? 0
 
-    const body = new Uint8Array(16)
-    const frame = await this.mux.request(
-      3010, // RequestId.Open
-      body,
-      Buffer.from(path),
-    )
+    const buf = buildOpenRequest(0, path, flags, mode)
+    const frame = await sendRequest(this.mux, buf, Buffer.from(path))
 
     if (frame.status === ResponseStatus.Error) {
       const { errnum, errmsg } = parseErrorResponse(frame.body)

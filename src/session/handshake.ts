@@ -50,72 +50,103 @@ export async function handshake(
   const handshakeBuf = buildHandshakeAndProtocol(0, flags, kXR_ExpLogin)
 
   const transport = (mux as unknown as { transport: ITransport }).transport
-  await transport.send(handshakeBuf)
 
-  // Use a single Framer for all handshake reads (handshake response + protocol response)
-  const framer = new Framer()
+  // Register the frame reader BEFORE sending to avoid a race condition:
+  // the server may respond before waitForFrame() would register its handler,
+  // and the Multiplexer's onData handler (already registered) would consume
+  // and drop the frames.
+  const reader = createFrameReader(transport)
 
-  const handshakeFrame = await waitForFrame(transport, framer)
-  // handshakeFrame contains: streamId=0, status=0, dlen=8, body=8B (protover + msgval)
-  // We don't need to parse it further; just consume it.
+  try {
+    await transport.send(handshakeBuf)
 
-  const protoFrame = await waitForFrame(transport, framer)
+    // First frame: ServerInitHandShake (streamId=0, status=0, dlen=8)
+    await reader.nextFrame()
 
-  if (protoFrame.status === ResponseStatus.Error) {
-    const err = parseErrorResponse(protoFrame.body)
-    throw new Error(`Protocol handshake error: ${err.errmsg} (${err.errnum})`)
-  }
+    // Second frame: kXR_ok + Protocol Response
+    const protoFrame = await reader.nextFrame()
 
-  if (protoFrame.status !== ResponseStatus.Ok) {
-    throw new Error(`Unexpected protocol response status: ${protoFrame.status}`)
-  }
+    if (protoFrame.status === ResponseStatus.Error) {
+      const err = parseErrorResponse(protoFrame.body)
+      throw new Error(`Protocol handshake error: ${err.errmsg} (${err.errnum})`)
+    }
 
-  const protoResp = parseProtocolResponse(protoFrame.body)
+    if (protoFrame.status !== ResponseStatus.Ok) {
+      throw new Error(`Unexpected protocol response status: ${protoFrame.status}`)
+    }
 
-  const loginBuf = buildLoginRequest(0, pid, username)
-  await transport.send(loginBuf)
+    const protoResp = parseProtocolResponse(protoFrame.body)
 
-  const loginFrame = await waitForFrame(transport, framer)
+    const loginBuf = buildLoginRequest(0, pid, username)
+    await transport.send(loginBuf)
 
-  if (loginFrame.status === ResponseStatus.Error) {
-    const err = parseErrorResponse(loginFrame.body)
-    throw new Error(`Login error: ${err.errmsg} (${err.errnum})`)
-  }
+    // Third frame: kXR_ok + Login Response
+    const loginFrame = await reader.nextFrame()
 
-  if (loginFrame.status === ResponseStatus.Redirect) {
-    const redir = parseRedirectResponse(loginFrame.body)
-    throw new Error(`Login redirect to ${redir.host}:${redir.port}`)
-  }
+    if (loginFrame.status === ResponseStatus.Error) {
+      const err = parseErrorResponse(loginFrame.body)
+      throw new Error(`Login error: ${err.errmsg} (${err.errnum})`)
+    }
 
-  if (loginFrame.status !== ResponseStatus.Ok) {
-    throw new Error(`Unexpected login response status: ${loginFrame.status}`)
-  }
+    if (loginFrame.status === ResponseStatus.Redirect) {
+      const redir = parseRedirectResponse(loginFrame.body)
+      throw new Error(`Login redirect to ${redir.host}:${redir.port}`)
+    }
 
-  const loginResp = parseLoginResponse(loginFrame.body)
+    if (loginFrame.status !== ResponseStatus.Ok) {
+      throw new Error(`Unexpected login response status: ${loginFrame.status}`)
+    }
 
-  return {
-    sessid: loginResp.sessid,
-    protocolVersion: protoResp.pval,
-    secReqs: protoResp.secReqs,
-    bifReqs: protoResp.bifReqs,
+    const loginResp = parseLoginResponse(loginFrame.body)
+
+    return {
+      sessid: loginResp.sessid,
+      protocolVersion: protoResp.pval,
+      secReqs: protoResp.secReqs,
+      bifReqs: protoResp.bifReqs,
+    }
+  } finally {
+    reader.close()
   }
 }
 
 /**
- * Wait for the next complete frame from the transport using the provided Framer.
- * This function registers an onData handler and resolves when a complete frame
- * is parsed. The handler is removed after the first frame is received.
+ * Creates a persistent frame reader that registers ONE onData handler
+ * before any data is sent, avoiding the race condition where the
+ * Multiplexer's handler consumes frames before the handshake can read them.
+ *
+ * Uses a queue pattern: incoming frames are queued, and nextFrame()
+ * resolves the next available frame (or waits for one to arrive).
  */
-function waitForFrame(transport: ITransport, framer: Framer): Promise<Frame> {
-  return new Promise<Frame>((resolve) => {
-    const handler = (chunk: Buffer) => {
-      const frames = framer.feed(chunk)
-      for (const frame of frames) {
-        transport.removeDataHandler(handler)
-        resolve(frame)
-        return
+function createFrameReader(transport: ITransport) {
+  const framer = new Framer()
+  const frameQueue: Frame[] = []
+  const waiters: Array<(frame: Frame) => void> = []
+
+  const handler = (chunk: Buffer) => {
+    const frames = framer.feed(chunk)
+    for (const frame of frames) {
+      if (waiters.length > 0) {
+        waiters.shift()!(frame)
+      } else {
+        frameQueue.push(frame)
       }
     }
-    transport.onData(handler)
-  })
+  }
+
+  transport.onData(handler)
+
+  return {
+    nextFrame(): Promise<Frame> {
+      if (frameQueue.length > 0) {
+        return Promise.resolve(frameQueue.shift()!)
+      }
+      return new Promise<Frame>((resolve) => {
+        waiters.push(resolve)
+      })
+    },
+    close() {
+      transport.removeDataHandler(handler)
+    },
+  }
 }

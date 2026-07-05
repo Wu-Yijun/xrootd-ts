@@ -4,7 +4,7 @@ import type { TestContext } from 'node:test'
 export const XROOTD_HOST = process.env.XROOTD_HOST || 'localhost'
 export const XROOTD_PORT = parseInt(process.env.XROOTD_PORT || '1094', 10)
 
-export const TEST_FILE_PATH = '/test/testfile.txt'
+export const TEST_FILE_PATH = '/data/test/testfile.txt'
 export const EXPECTED_FILE_CONTENTS =
   'Hello, XRootD!\n' +
   'This is a test file for the mock server.\n' +

@@ -34,6 +34,12 @@ class MockTransportForHandshake {
     this.dataCallback = callback
   }
 
+  removeDataHandler(callback: (chunk: Buffer) => void): void {
+    if (this.dataCallback === callback) {
+      this.dataCallback = null
+    }
+  }
+
   onClose(callback: () => void): void {
     this.closeCallback = callback
   }
@@ -47,46 +53,49 @@ class MockTransportForHandshake {
   }
 }
 
+function makeServerInitFrame(): Buffer {
+  const body = Buffer.alloc(8)
+  body.writeUInt32BE(0x520, 0) // protover
+  body.writeUInt32BE(1, 4)     // msgval (DataServer)
+  return buildResponseFrame(0, 0, body)
+}
+
+function makeProtocolResponseFrame(): Buffer {
+  const body = Buffer.alloc(8)
+  body.writeUInt32BE(0x520, 0) // pval
+  body.writeUInt32BE(0x09, 4)  // flags
+  return buildResponseFrame(0, 0, body)
+}
+
+function makeLoginResponseFrame(): Buffer {
+  const body = Buffer.alloc(16)
+  for (let i = 0; i < 16; i++) body[i] = i + 1
+  return buildResponseFrame(0, 0, body)
+}
+
 describe('handshake', () => {
   it('returns Session with correct sessid and protocolVersion', async () => {
     const transport = new MockTransportForHandshake()
     const mux = new Multiplexer(transport as any)
     const url = new XRootDUrl('root://host.cern.ch/data')
 
-    // handshake() will call transport.send(handshakeBuf)
-    // then readExact(transport, 20) which registers its own onData handler
-    // then waitForFrame(mux) which registers another onData handler
-    // then transport.send(loginBuf)
-    // then waitForFrame(mux) again
-
     const sessionPromise = handshake(mux, url, { username: 'test', pid: 1234 })
 
-    // Let the handshake function start and register handlers
+    // Let the handshake register its frame reader handler and send the handshake
     await new Promise(r => setTimeout(r, 10))
 
-    // Step 1: handshake was sent, send back ServerResponseHeader(8B) + ServerInitHandShake(12B) = 20 bytes
-    const serverInit = Buffer.alloc(20)
-    serverInit.writeUInt32BE(0, 0)   // msglen
-    serverInit.writeUInt32BE(0x520, 4) // protover
-    serverInit.writeUInt32BE(1, 8)  // msgval (DataServer)
-    transport.emit(serverInit)
+    // Step 1: send ServerInitHandShake frame
+    transport.emit(makeServerInitFrame())
 
-    // Wait for readExact to process and waitForFrame to register its handler
     await new Promise(r => setTimeout(r, 10))
 
-    // Step 2: send kXR_ok + protocol response (using streamId=0 since the handshake uses streamId=0)
-    const protoBody = Buffer.alloc(8)
-    protoBody.writeUInt32BE(0x520, 0) // pval
-    protoBody.writeUInt32BE(0x09, 4)  // flags
-    transport.emit(buildResponseFrame(0, 0, protoBody))
+    // Step 2: send kXR_ok + protocol response
+    transport.emit(makeProtocolResponseFrame())
 
-    // Wait for waitForFrame to resolve, login to be sent, and next waitForFrame to register
     await new Promise(r => setTimeout(r, 10))
 
     // Step 3: send kXR_ok + sessid[16]
-    const loginBody = Buffer.alloc(16)
-    for (let i = 0; i < 16; i++) loginBody[i] = i + 1
-    transport.emit(buildResponseFrame(0, 0, loginBody))
+    transport.emit(makeLoginResponseFrame())
 
     const session = await sessionPromise
 
@@ -105,25 +114,15 @@ describe('handshake', () => {
 
     await new Promise(r => setTimeout(r, 10))
 
-    // Send all responses to unblock handshake
-    const serverInit = Buffer.alloc(20)
-    serverInit.writeUInt32BE(0, 0)
-    serverInit.writeUInt32BE(0x520, 4)
-    serverInit.writeUInt32BE(1, 8)
-    transport.emit(serverInit)
+    transport.emit(makeServerInitFrame())
 
     await new Promise(r => setTimeout(r, 10))
 
-    transport.emit(buildResponseFrame(0, 0, (() => {
-      const b = Buffer.alloc(8)
-      b.writeUInt32BE(0x520, 0)
-      b.writeUInt32BE(0x09, 4)
-      return b
-    })()))
+    transport.emit(makeProtocolResponseFrame())
 
     await new Promise(r => setTimeout(r, 10))
 
-    transport.emit(buildResponseFrame(0, 0, Buffer.alloc(16)))
+    transport.emit(makeLoginResponseFrame())
 
     await sessionPromise
 
@@ -154,24 +153,15 @@ describe('handshake', () => {
 
     await new Promise(r => setTimeout(r, 10))
 
-    const serverInit = Buffer.alloc(20)
-    serverInit.writeUInt32BE(0, 0)
-    serverInit.writeUInt32BE(0x520, 4)
-    serverInit.writeUInt32BE(1, 8)
-    transport.emit(serverInit)
+    transport.emit(makeServerInitFrame())
 
     await new Promise(r => setTimeout(r, 10))
 
-    transport.emit(buildResponseFrame(0, 0, (() => {
-      const b = Buffer.alloc(8)
-      b.writeUInt32BE(0x520, 0)
-      b.writeUInt32BE(0x09, 4)
-      return b
-    })()))
+    transport.emit(makeProtocolResponseFrame())
 
     await new Promise(r => setTimeout(r, 10))
 
-    transport.emit(buildResponseFrame(0, 0, Buffer.alloc(16)))
+    transport.emit(makeLoginResponseFrame())
 
     await sessionPromise
 
