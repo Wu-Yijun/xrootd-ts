@@ -778,7 +778,7 @@ export function parseDirlistResponse(body: Buffer): DirlistResponse {
         name,
         size: parseInt(fields[0], 10) || 0,
         flags: parseInt(fields[1], 10) || 0,
-        modTime: parseInt(fields[2], 10) || 0,
+        mtime: parseInt(fields[2], 10) || 0,
       });
     }
   }
