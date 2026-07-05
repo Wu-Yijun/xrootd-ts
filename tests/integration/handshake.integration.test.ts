@@ -5,24 +5,12 @@ import { Multiplexer } from "../../src/transport/multiplexer.ts";
 import { handshake } from "../../src/session/handshake.ts";
 import { XRootDUrl } from "../../src/url/url.ts";
 import { XRootDClient } from "../../src/client.ts";
-import { ifServerUnavailable, XROOTD_HOST, XROOTD_PORT } from "./setup.ts";
+import { ifServerUnavailable, XROOTD_HOST, XROOTD_PORT,withTimeout } from "./setup.ts";
 
 const skip = await ifServerUnavailable()
   ? "SKIP: XRootD server not available"
   : undefined;
 
-function withTimeout<T>(
-  promise: Promise<T>,
-  ms: number,
-  label: string,
-): Promise<T> {
-  return Promise.race([
-    promise,
-    new Promise<T>((_, reject) =>
-      setTimeout(() => reject(new Error(`Timeout after ${ms}ms: ${label}`)), ms)
-    ),
-  ]);
-}
 
 describe("Integration: handshake", { skip }, () => {
   it("handshake() returns Session with valid sessid and protocolVersion", async () => {

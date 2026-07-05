@@ -14,24 +14,12 @@ import {
   TEST_FILE_PATH,
   XROOTD_HOST,
   XROOTD_PORT,
+  withTimeout
 } from "./setup.ts";
 
 const skip = await ifServerUnavailable()
   ? "SKIP: XRootD server not available"
   : undefined;
-
-function withTimeout<T>(
-  promise: Promise<T>,
-  ms: number,
-  label: string,
-): Promise<T> {
-  return Promise.race([
-    promise,
-    new Promise<T>((_, reject) =>
-      setTimeout(() => reject(new Error(`Timeout after ${ms}ms: ${label}`)), ms)
-    ),
-  ]);
-}
 
 async function createConnectedClient(): Promise<{
   transport: Transport;
