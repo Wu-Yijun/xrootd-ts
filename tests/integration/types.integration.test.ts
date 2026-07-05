@@ -223,7 +223,7 @@ describe("Integration: XRootDError class", () => {
     );
     assert.equal(
       XRootDError.codeToMessage(ClientError.Timeout),
-      "Request timed out",
+      "Timeout",
     );
     assert.equal(
       XRootDError.codeToMessage(ClientError.Disconnected),
