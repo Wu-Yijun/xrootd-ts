@@ -19,6 +19,10 @@ export async function doAuthentication(
   secReqs: string,
   params: AuthParams,
 ): Promise<SecEntity> {
+  if (!secReqs || secReqs.trim().length === 0) {
+    return { prot: '', uid: 0, gid: 0 }
+  }
+
   const supportedProtocols = secReqs.split(',').map((s) => s.trim())
 
   for (const protoName of supportedProtocols) {
