@@ -5,7 +5,7 @@ import type {
 } from "../security/interface.ts";
 import type { Multiplexer } from "../transport/multiplexer.ts";
 import type { Frame } from "../transport/framer.ts";
-import { RequestId, ResponseStatus } from "../protocol/constants.ts";
+import { RequestId, ResponseStatus, ServerError } from "../protocol/constants.ts";
 import { parseErrorResponse } from "../protocol/message.ts";
 import { XRootDError } from "../api/errors.ts";
 
@@ -38,7 +38,7 @@ export async function doAuthentication(
   }
 
   throw new XRootDError(
-    3030,
+    ServerError.AuthFailed,
     `No supported authentication protocol. Server requires: ${secReqs}`,
   );
 }
@@ -77,7 +77,7 @@ async function executeAuth(
   if (frame.status !== ResponseStatus.Ok) {
     const { errnum, errmsg } = parseErrorResponse(frame.body);
     throw new XRootDError(
-      errnum || 3030,
+      errnum || ServerError.AuthFailed,
       errmsg || `Authentication failed with protocol: ${protocol.name}`,
     );
   }
@@ -85,19 +85,18 @@ async function executeAuth(
   return protocol.getEntity();
 }
 
+const CRED_TYPE: Record<string, number> = {
+  host: 0,
+  sss: 1,
+  unix: 2,
+  krb5: 3,
+  gsi: 4,
+};
+
 function getCredType(name: string): number {
-  switch (name) {
-    case "host":
-      return 0;
-    case "sss":
-      return 1;
-    case "unix":
-      return 2;
-    case "krb5":
-      return 3;
-    case "gsi":
-      return 4;
-    default:
-      throw new Error(`Unknown auth protocol: ${name}`);
+  const credType = CRED_TYPE[name];
+  if (credType === undefined) {
+    throw new Error(`Unknown auth protocol: ${name}`);
   }
+  return credType;
 }
