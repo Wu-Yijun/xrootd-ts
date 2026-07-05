@@ -17,6 +17,37 @@ export interface StatInfo {
   get isCached(): boolean;
 }
 
+const S_IFDIR = 0o040000;
+const S_IFLNK = 0o120000;
+
+export function createStatInfo(data: string): StatInfo {
+  const parts = data.trim().split(/\s+/);
+  const id = parseInt(parts[0] ?? "0", 10) || 0;
+  const size = parseInt(parts[1] ?? "0", 10) || 0;
+  const mtime = parseInt(parts[3] ?? "0", 10) || 0;
+  const modeStr = parts[6] ?? "0";
+  const mode = parseInt(modeStr, 8) || 0;
+
+  return {
+    id,
+    size,
+    mtime,
+    flags: mode,
+    get isDirectory() {
+      return (mode & S_IFDIR) !== 0;
+    },
+    get isLink() {
+      return (mode & S_IFLNK) === S_IFLNK;
+    },
+    get isOffline() {
+      return false;
+    },
+    get isCached() {
+      return false;
+    },
+  };
+}
+
 export interface ChunkInfo {
   fhandle: Uint8Array;
   offset: number;

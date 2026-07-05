@@ -13,7 +13,7 @@ import {
 } from "../protocol/message.ts";
 import { ResponseStatus } from "../protocol/constants.ts";
 import { XRootDError } from "./errors.ts";
-import type { StatInfo } from "./types.ts";
+import { type StatInfo, createStatInfo } from "./types.ts";
 
 export class File {
   private mux: Multiplexer;
@@ -191,30 +191,5 @@ async function sendRequest(
 }
 
 function parseStatInfo(body: Buffer): StatInfo {
-  const text = body.toString("utf-8").trim();
-  const parts = text.split(/\s+/);
-
-  const modeStr = parts[6] ?? "0";
-  const mode = parseInt(modeStr, 8) || 0;
-
-  const info: StatInfo = {
-    id: parseInt(parts[0] ?? "0", 10) || 0,
-    size: parseInt(parts[1] ?? "0", 10) || 0,
-    mtime: parseInt(parts[3] ?? "0", 10) || 0,
-    flags: mode,
-    get isDirectory() {
-      return (mode & 0o040000) !== 0;
-    },
-    get isLink() {
-      return (mode & 0o120000) === 0o120000;
-    },
-    get isOffline() {
-      return false;
-    },
-    get isCached() {
-      return false;
-    },
-  };
-
-  return info;
+  return createStatInfo(body.toString("utf-8"));
 }

@@ -13,35 +13,7 @@ import {
 import { RequestId, ResponseStatus } from "../protocol/constants.ts";
 import { XRootDError } from "./errors.ts";
 import type { DirectoryList, StatInfo } from "./types.ts";
-
-function createStatInfo(data: string): StatInfo {
-  const parts = data.trim().split(/\s+/);
-  const id = parseInt(parts[0], 10) || 0;
-  const size = parseInt(parts[1], 10) || 0;
-  const mtime = parseInt(parts[3], 10) || 0;
-  const modeStr = parts[6] ?? "0";
-  const mode = parseInt(modeStr, 8) || 0;
-  const flags = mode;
-
-  return {
-    id,
-    size,
-    mtime,
-    flags,
-    get isDirectory() {
-      return (mode & 0o040000) !== 0;
-    },
-    get isLink() {
-      return (mode & 0o120000) === 0o120000;
-    },
-    get isOffline() {
-      return false;
-    },
-    get isCached() {
-      return false;
-    },
-  };
-}
+import { createStatInfo } from "./types.ts";
 
 function extractBody(buf: Buffer): Uint8Array {
   return new Uint8Array(buf.subarray(4, 20));
