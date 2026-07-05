@@ -1,15 +1,3 @@
-export interface XRootDClientOptions {
-  /** Authentication credentials */
-  credentials?: {
-    username: string;
-    password?: string;
-  };
-  /** Connection timeout in milliseconds */
-  timeout?: number;
-  /** Number of redirect attempts */
-  maxRedirects?: number;
-}
-
 export interface FileHandle {
   /** Unique file handle identifier */
   readonly handle: number;
