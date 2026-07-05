@@ -1,6 +1,9 @@
-import { ServerError } from "../protocol/constants.ts";
+import { ClientError, ServerError } from "../protocol/constants.ts";
 
-const codeMessages: Record<number, string> = {
+/** Error codes that can be used with XRootDError. */
+export type ErrorCode = ServerError | ClientError;
+
+const codeMessages: Record<ErrorCode, string> = {
   [ServerError.ArgInvalid]: "Invalid argument",
   [ServerError.ArgMissing]: "Missing argument",
   [ServerError.ArgTooLong]: "Argument too long",
@@ -37,20 +40,42 @@ const codeMessages: Record<number, string> = {
   [ServerError.TooManyErrs]: "Too many errors",
   [ServerError.ReqTimedOut]: "Request timed out",
   [ServerError.TimerExpired]: "Timer expired",
+  [ClientError.Ok]: "OK",
+  [ClientError.InvalidArgs]: "Invalid arguments",
+  [ClientError.NotFound]: "Not found",
+  [ClientError.Permission]: "Permission denied",
+  [ClientError.Serialization]: "Serialization error",
+  [ClientError.CommandNotFound]: "Command not found",
+  [ClientError.HostNotFound]: "Host not found",
+  [ClientError.ServiceUnavail]: "Service unavailable",
+  [ClientError.InternalError]: "Internal error",
+  [ClientError.BadRequest]: "Bad request",
+  [ClientError.Timeout]: "Timeout",
+  [ClientError.InsufficientData]: "Insufficient data",
+  [ClientError.Uninitialized]: "Client not connected",
+  [ClientError.Disconnected]: "Disconnected",
+  [ClientError.Redirect]: "Redirect",
+  [ClientError.LossyRetry]: "Lossy retry",
+  [ClientError.TooManyRedirs]: "Too many redirects",
+  [ClientError.ChunkChecksumErr]: "Chunk checksum error",
+  [ClientError.UnexpectedResp]: "Unexpected response",
+  [ClientError.ClientSkipped]: "Client skipped",
+  [ClientError.Failed]: "Failed",
+  [ClientError.WinNetworkError]: "Windows network error",
 };
 
 export class XRootDError extends Error {
-  readonly code: number;
+  readonly code: ErrorCode | number;
   readonly errno?: number;
 
-  constructor(code: number, message?: string, errno?: number) {
-    super(message ?? XRootDError.codeToMessage(code));
+  constructor(code: ErrorCode | number, message?: string, errno?: number) {
+    super(message ?? XRootDError.codeToMessage(code as ErrorCode));
     this.name = "XRootDError";
     this.code = code;
     this.errno = errno;
   }
 
-  static codeToMessage(code: number): string {
-    return codeMessages[code] ?? `Unknown error (${code})`;
+  static codeToMessage(code: ErrorCode | number): string {
+    return codeMessages[code as ErrorCode] ?? `Unknown error (${code})`;
   }
 }
