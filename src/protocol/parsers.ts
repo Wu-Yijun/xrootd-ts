@@ -111,9 +111,16 @@ export function parseLoginResponse(body: Buffer): LoginResponse {
  */
 export function parseOpenResponse(body: Buffer): OpenResponse {
   const [fhandle] = getBytes(body, 0, 4);
-  const [cpsize] = get32(body, 4);
-  const [cptypeRaw] = getBytes(body, 8, 4);
-  const cptype = Buffer.from(cptypeRaw).toString("utf8").replace(/\0+$/, "");
+  let cpsize = 0;
+  let cptype = "";
+  if (body.length >= 8) {
+    const [v] = get32(body, 4);
+    cpsize = v;
+  }
+  if (body.length >= 12) {
+    const [raw] = getBytes(body, 8, 4);
+    cptype = Buffer.from(raw).toString("utf8").replace(/\0+$/, "");
+  }
   return { fhandle: new Uint8Array(fhandle), cpsize, cptype };
 }
 
