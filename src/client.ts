@@ -6,6 +6,8 @@ import { File } from './api/file.ts'
 import type { Session } from './session/handshake.ts'
 import type { StatInfo } from './api/file.ts'
 import { XRootDError } from './api/errors.ts'
+import { RequestId } from './protocol/constants.ts'
+import { buildEndsessRequest } from './protocol/message.ts'
 
 export interface XRootDClientOptions {
   credentials?: {
@@ -29,18 +31,51 @@ export class XRootDClient {
   }
 
   async connect(): Promise<void> {
-    this.transport = new Transport()
-    await this.transport.connect(this.url.host, this.url.port)
+    await this.doConnect(this.url)
+  }
 
-    this.mux = new Multiplexer(this.transport)
+  private async doConnect(url: XRootDUrl): Promise<void> {
+    this.transport = new Transport()
+    await this.transport.connect(url.host, url.port)
+
+    this.mux = new Multiplexer(this.transport, {
+      maxRedirects: this.options.maxRedirects ?? 16,
+      onRedirect: (host, port) => this.handleRedirect(host, port),
+    })
 
     if (this.options.timeout) {
       this.mux.setTimeout(this.options.timeout)
     }
 
-    this.session = await handshake(this.mux, this.url, {
+    this.session = await handshake(this.mux, url, {
       username: this.options.credentials?.username,
     })
+  }
+
+  private async handleRedirect(host: string, port: number): Promise<void> {
+    // End old session if exists
+    if (this.session && this.mux) {
+      try {
+        const endsessBody = buildEndsessRequest(0, this.session.sessid)
+        await this.mux.request(RequestId.Endsess, new Uint8Array(endsessBody))
+      } catch {
+        // Ignore endsess errors (old session may have expired)
+      }
+    }
+
+    // Close old connection
+    if (this.mux) {
+      this.mux.close()
+      this.mux = null
+    }
+    if (this.transport) {
+      await this.transport.close()
+      this.transport = null
+    }
+
+    // Connect to new host
+    const newUrl = XRootDUrl.parse(`root://${host}:${port}`)
+    await this.doConnect(newUrl)
   }
 
   async open(path: string, options?: { flags?: number; mode?: number }): Promise<File> {

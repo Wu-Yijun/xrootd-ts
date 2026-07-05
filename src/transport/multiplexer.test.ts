@@ -155,4 +155,129 @@ describe('Multiplexer', () => {
       /closed/,
     )
   })
+
+  describe('redirect handling', () => {
+    it('redirect triggers onRedirect callback and retries', async () => {
+      let redirectHost = ''
+      let redirectPort = 0
+      let retryCalled = false
+
+      const redirectMux = new Multiplexer(transport, {
+        maxRedirects: 16,
+        onRedirect: async (host, port) => {
+          redirectHost = host
+          redirectPort = port
+          retryCalled = true
+        },
+      })
+
+      const body = new Uint8Array(16)
+      const responsePromise = redirectMux.request(3006, body)
+
+      await sleep(1)
+
+      // Build redirect response body: port[4] + host
+      const host = 'newserver.example.com'
+      const redirectBody = Buffer.alloc(4 + host.length + 1)
+      redirectBody.writeInt32BE(1095, 0)
+      redirectBody.write(host, 4, 'utf8')
+
+      transport.simulateResponse(4004, redirectBody)
+
+      await sleep(10)
+
+      assert.equal(redirectHost, 'newserver.example.com')
+      assert.equal(redirectPort, 1095)
+      assert.equal(retryCalled, true)
+
+      redirectMux.close()
+    })
+
+    it('rejects when max redirects exceeded', async () => {
+      const redirectMux = new Multiplexer(transport, {
+        maxRedirects: 2,
+        onRedirect: async () => {},
+      })
+
+      const body = new Uint8Array(16)
+      const promise = redirectMux.request(3006, body)
+
+      await sleep(1)
+
+      const host = 'server'
+      const redirectBody = Buffer.alloc(4 + host.length + 1)
+      redirectBody.writeInt32BE(1094, 0)
+      redirectBody.write(host, 4, 'utf8')
+
+      // First redirect
+      transport.simulateResponse(4004, redirectBody)
+      await sleep(10)
+
+      // Second redirect - need a new request since the first one retried
+      await sleep(1)
+      const promise2 = redirectMux.request(3006, body)
+      await sleep(1)
+      transport.simulateResponse(4004, redirectBody)
+      await sleep(10)
+
+      // Third redirect should fail
+      await sleep(1)
+      const promise3 = redirectMux.request(3006, body)
+      await sleep(1)
+      transport.simulateResponse(4004, redirectBody)
+
+      await assert.rejects(promise3, /Too many redirects/)
+
+      redirectMux.close()
+    })
+
+    it('rejects when no onRedirect handler configured', async () => {
+      const body = new Uint8Array(16)
+      const promise = mux.request(3006, body)
+
+      await sleep(1)
+
+      const host = 'server'
+      const redirectBody = Buffer.alloc(4 + host.length + 1)
+      redirectBody.writeInt32BE(1094, 0)
+      redirectBody.write(host, 4, 'utf8')
+
+      transport.simulateResponse(4004, redirectBody)
+
+      await assert.rejects(promise, /no onRedirect handler/)
+    })
+
+    it('resetRedirectCount resets counter', async () => {
+      let callCount = 0
+      const redirectMux = new Multiplexer(transport, {
+        maxRedirects: 1,
+        onRedirect: async () => { callCount++ },
+      })
+
+      const body = new Uint8Array(16)
+      const host = 'server'
+      const redirectBody = Buffer.alloc(4 + host.length + 1)
+      redirectBody.writeInt32BE(1094, 0)
+      redirectBody.write(host, 4, 'utf8')
+
+      // First redirect
+      const p1 = redirectMux.request(3006, body)
+      await sleep(1)
+      transport.simulateResponse(4004, redirectBody)
+      await sleep(10)
+
+      // Reset counter
+      redirectMux.resetRedirectCount()
+
+      // Second redirect should work
+      const p2 = redirectMux.request(3006, body)
+      await sleep(1)
+      transport.simulateResponse(4004, redirectBody)
+      await sleep(10)
+
+      assert.equal(callCount, 2)
+
+      redirectMux.close()
+    })
+  })
 })

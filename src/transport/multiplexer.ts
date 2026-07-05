@@ -1,7 +1,8 @@
 import type { ITransport } from './interface.ts'
 import { Framer, type Frame } from './framer.ts'
 import { Message } from '../protocol/message.ts'
-import { ResponseStatus } from '../protocol/constants.ts'
+import { ResponseStatus, ClientError } from '../protocol/constants.ts'
+import { parseRedirectResponse } from '../protocol/message.ts'
 
 interface PendingRequest {
   resolve: (frame: Frame) => void
@@ -10,6 +11,11 @@ interface PendingRequest {
   requestId: number
   body: Uint8Array
   data?: Uint8Array
+}
+
+export interface MultiplexerOptions {
+  maxRedirects?: number
+  onRedirect?: (host: string, port: number) => Promise<void>
 }
 
 /**
@@ -27,10 +33,15 @@ export class Multiplexer {
   private timeout = 30000
   private sweepTimer: ReturnType<typeof globalThis.setInterval> | null = null
   private closed = false
+  private redirectCount = 0
+  private maxRedirects: number
+  private onRedirect?: (host: string, port: number) => Promise<void>
 
-  constructor(transport: ITransport) {
+  constructor(transport: ITransport, options?: MultiplexerOptions) {
     this.transport = transport
     this.framer = new Framer()
+    this.maxRedirects = options?.maxRedirects ?? 16
+    this.onRedirect = options?.onRedirect
 
     this.sweepTimer = globalThis.setInterval(() => this.sweepTimeouts(), 1000)
     this.sweepTimer.unref()
@@ -118,6 +129,39 @@ export class Multiplexer {
       return
     }
 
+    if (frame.status === ResponseStatus.Redirect) {
+      const pending = this.pending.get(sid)
+      if (!pending) return
+
+      if (this.redirectCount >= this.maxRedirects) {
+        this.pending.delete(sid)
+        pending.reject(new Error(
+          `Too many redirects (max ${this.maxRedirects})`
+        ))
+        return
+      }
+
+      this.redirectCount++
+      const { host, port } = parseRedirectResponse(frame.body)
+
+      if (this.onRedirect) {
+        this.onRedirect(host, port)
+          .then(() => {
+            this.retryRequest(sid)
+          })
+          .catch((err) => {
+            this.pending.delete(sid)
+            pending.reject(err)
+          })
+      } else {
+        this.pending.delete(sid)
+        pending.reject(new Error(
+          `Redirect to ${host}:${port} but no onRedirect handler configured`
+        ))
+      }
+      return
+    }
+
     const pending = this.pending.get(sid)
     if (!pending) return
     this.pending.delete(sid)
@@ -145,6 +189,10 @@ export class Multiplexer {
 
   setTimeout(ms: number): void {
     this.timeout = ms
+  }
+
+  resetRedirectCount(): void {
+    this.redirectCount = 0
   }
 
   close(): void {
