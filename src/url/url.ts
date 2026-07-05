@@ -1,4 +1,4 @@
-const DEFAULT_PORT = 1094;
+import { DEFAULT_PORT } from "../protocol/constants.ts";
 
 export class XRootDUrl {
   protocol: string;

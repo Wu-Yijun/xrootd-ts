@@ -165,3 +165,6 @@ export const kXR_bifreqs = 0x08;
 // ── Expect values (kXR_protocol expect field) ─────────────────────────────
 export const kXR_ExpLogin = 0x01;
 export const kXR_ExpBind = 0x02;
+
+// ── Default XRootD port ───────────────────────────────────────────────────
+export const DEFAULT_PORT = 1094;
