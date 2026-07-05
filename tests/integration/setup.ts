@@ -12,8 +12,22 @@ import { FileSystem } from "../../src/api/filesystem.ts";
 import type { Session } from "../../src/session/handshake.ts";
 import { XRootDClient } from "../../src/client.ts";
 
-import { XROOTD_HOST, XROOTD_PORT, SERVER_URL, TEST_FILE_PATH, EXPECTED_FILE_CONTENTS, TEST_WRITE_DIR } from "./config.ts";
-export { XROOTD_HOST, XROOTD_PORT, SERVER_URL, TEST_FILE_PATH, EXPECTED_FILE_CONTENTS, TEST_WRITE_DIR } from "./config.ts";
+import {
+  EXPECTED_FILE_CONTENTS,
+  SERVER_URL,
+  TEST_FILE_PATH,
+  TEST_WRITE_DIR,
+  XROOTD_HOST,
+  XROOTD_PORT,
+} from "./config.ts";
+export {
+  EXPECTED_FILE_CONTENTS,
+  SERVER_URL,
+  TEST_FILE_PATH,
+  TEST_WRITE_DIR,
+  XROOTD_HOST,
+  XROOTD_PORT,
+} from "./config.ts";
 
 export function withTimeout<T>(
   promise: Promise<T>,
@@ -24,7 +38,10 @@ export function withTimeout<T>(
   return Promise.race([
     promise.finally(() => clearTimeout(timer)),
     new Promise<T>((_, reject) =>
-      timer = setTimeout(() => reject(new Error(`Timeout after ${ms}ms: ${label}`)), ms)
+      timer = setTimeout(
+        () => reject(new Error(`Timeout after ${ms}ms: ${label}`)),
+        ms,
+      )
     ),
   ]);
 }

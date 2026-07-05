@@ -1,4 +1,3 @@
-
 export const XROOTD_HOST = process.env.XROOTD_HOST || "localhost";
 export const XROOTD_PORT = parseInt(process.env.XROOTD_PORT || "1094", 10);
 export const SERVER_URL = `root://${XROOTD_HOST}:${XROOTD_PORT}/`;

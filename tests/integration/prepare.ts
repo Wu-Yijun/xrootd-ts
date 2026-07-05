@@ -1,4 +1,4 @@
-import {rm, mkdir, writeFile} from "node:fs/promises";
+import { mkdir, rm, writeFile } from "node:fs/promises";
 import { EXPECTED_FILE_CONTENTS } from "./config.ts";
 
 await rm("./mock-server/data/test", { recursive: true, force: true });

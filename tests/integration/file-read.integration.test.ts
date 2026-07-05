@@ -12,9 +12,9 @@ import {
   EXPECTED_FILE_CONTENTS,
   ifServerUnavailable,
   TEST_FILE_PATH,
+  withTimeout,
   XROOTD_HOST,
   XROOTD_PORT,
-  withTimeout
 } from "./setup.ts";
 
 const skip = await ifServerUnavailable()
