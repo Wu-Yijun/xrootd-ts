@@ -229,3 +229,71 @@ describe("Integration: XRootDClient file operations", () => {
     }
   });
 });
+
+describe("Integration: file read edge cases", () => {
+  before(skipIfServerUnavailable);
+
+  it("read with size larger than file returns available bytes", async () => {
+    const { transport, mux, session } = await createConnectedClient();
+    try {
+      const file = new File(mux, session);
+      await file.open(TEST_FILE_PATH);
+
+      const actualSize = Buffer.byteLength(EXPECTED_FILE_CONTENTS);
+      const data = await file.read(0, actualSize + 1000);
+      assert.ok(data.length > 0, "should return some data");
+      assert.ok(
+        data.length <= actualSize,
+        `should not return more than file size: got ${data.length}, file is ${actualSize}`,
+      );
+
+      const text = new TextDecoder().decode(data);
+      assert.ok(text.startsWith("Hello"), "should start with file content");
+      await file.close();
+    } finally {
+      mux.close();
+      await transport.close();
+    }
+  });
+
+  it("read at offset near end returns fewer bytes", async () => {
+    const { transport, mux, session } = await createConnectedClient();
+    try {
+      const file = new File(mux, session);
+      await file.open(TEST_FILE_PATH);
+
+      const actualSize = Buffer.byteLength(EXPECTED_FILE_CONTENTS);
+      const offset = actualSize - 5;
+      const data = await file.read(offset, 1000);
+
+      const expected = EXPECTED_FILE_CONTENTS.slice(offset);
+      const text = new TextDecoder().decode(data);
+      assert.equal(text, expected, "should read only remaining bytes");
+      await file.close();
+    } finally {
+      mux.close();
+      await transport.close();
+    }
+  });
+
+  it("sequential reads produce consistent results", async () => {
+    const { transport, mux, session } = await createConnectedClient();
+    try {
+      const file = new File(mux, session);
+      await file.open(TEST_FILE_PATH);
+
+      const data1 = await file.read(0, 10);
+      const data2 = await file.read(0, 10);
+
+      assert.deepEqual(
+        Array.from(data1),
+        Array.from(data2),
+        "two reads from same offset should return same data",
+      );
+      await file.close();
+    } finally {
+      mux.close();
+      await transport.close();
+    }
+  });
+});

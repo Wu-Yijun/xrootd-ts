@@ -160,3 +160,57 @@ describe("Integration: XRootDClient filesystem operations", () => {
     }
   });
 });
+
+describe("Integration: FileSystem.readdir entry fields", () => {
+  before(skipIfServerUnavailable);
+
+  it("readdir entries have correct types for all fields", async () => {
+    const { fs, close } = await createConnectedFileSystem();
+    try {
+      const list = await fs.readdir("/data/test");
+      assert.ok(list.entries.length > 0, "should have entries");
+
+      for (const entry of list.entries) {
+        assert.equal(typeof entry.name, "string", "name should be string");
+        assert.equal(typeof entry.size, "number", "size should be number");
+        assert.equal(typeof entry.flags, "number", "flags should be number");
+        assert.equal(typeof entry.mtime, "number", "mtime should be number");
+        assert.ok(entry.name.length > 0, "name should not be empty");
+      }
+    } finally {
+      await close();
+    }
+  });
+
+  it("testfile.txt entry has correct size", async () => {
+    const { fs, close } = await createConnectedFileSystem();
+    try {
+      const list = await fs.readdir("/data/test");
+      const entry = list.entries.find((e) => e.name === "testfile.txt");
+      assert.ok(entry, "testfile.txt should exist");
+      assert.equal(
+        entry.size,
+        Buffer.byteLength("Hello, XRootD!\nThis is a test file for the mock server.\nLine 3: Testing basic file operations.\nLine 4: Reading offset and size should work.\nLine 5: End of test file.\n"),
+        "size should match content",
+      );
+    } finally {
+      await close();
+    }
+  });
+});
+
+describe("Integration: FileSystem.stat on root", () => {
+  before(skipIfServerUnavailable);
+
+  it("stat on /data returns valid directory info", async () => {
+    const { fs, close } = await createConnectedFileSystem();
+    try {
+      const info = await fs.stat("/data");
+      assert.ok(info, "stat info should be defined");
+      assert.equal(info.isDirectory, true, "/data should be a directory");
+      assert.ok(info.mtime > 0, "mtime should be > 0");
+    } finally {
+      await close();
+    }
+  });
+});
