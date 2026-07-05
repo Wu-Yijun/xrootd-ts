@@ -1,4 +1,4 @@
-import { describe, it, before, after } from 'node:test'
+import { describe, it, before } from 'node:test'
 import assert from 'node:assert/strict'
 import { Transport } from '../../src/transport/transport.ts'
 import { Multiplexer } from '../../src/transport/multiplexer.ts'
@@ -15,6 +15,15 @@ import {
   skipIfServerUnavailable,
 } from './setup.ts'
 
+function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<T>((_, reject) =>
+      setTimeout(() => reject(new Error(`Timeout after ${ms}ms: ${label}`)), ms)
+    ),
+  ])
+}
+
 async function createConnectedClient(): Promise<{
   transport: Transport
   mux: Multiplexer
@@ -24,7 +33,11 @@ async function createConnectedClient(): Promise<{
   await transport.connect(XROOTD_HOST, XROOTD_PORT)
   const mux = new Multiplexer(transport)
   const url = new XRootDUrl(`root://${XROOTD_HOST}:${XROOTD_PORT}/`)
-  const session = await handshake(mux, url)
+  const session = await withTimeout(
+    handshake(mux, url),
+    5000,
+    'handshake with xrootd server',
+  )
   return { transport, mux, session }
 }
 
@@ -33,7 +46,7 @@ describe('Integration: file read flow', () => {
     await skipIfServerUnavailable.call(this)
   })
 
-  it('login → open → read → close', async () => {
+  it('login -> open -> read -> close', async () => {
     const { transport, mux, session } = await createConnectedClient()
 
     try {

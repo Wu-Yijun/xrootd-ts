@@ -744,7 +744,7 @@ export interface DirectoryEntry {
   name: string;
   size: number;
   flags: number;
-  modTime: number;
+  mtime: number;
 }
 
 export interface DirlistResponse {

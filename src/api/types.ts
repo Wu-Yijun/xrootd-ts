@@ -52,3 +52,22 @@ export interface ProtocolInfo {
   version: number
   flags: number
 }
+
+export interface AuthConfig {
+  username?: string
+  password?: string
+  protocol?: string
+}
+
+export interface ClientOptions {
+  credentials?: AuthConfig
+  timeout?: number
+  maxRedirects?: number
+}
+
+export interface DirectoryEntry {
+  name: string
+  size: number
+  flags: number
+  mtime: number
+}
