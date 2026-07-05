@@ -56,8 +56,7 @@ export class Transport implements ITransport {
   }
 
   async close(): Promise<void> {
-    this.socket?.destroy();
-    this.socket = null;
+    this.destroy();
   }
 
   destroy(): void {
