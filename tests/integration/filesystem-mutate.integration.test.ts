@@ -36,17 +36,31 @@ describe("Integration: FileSystem.mkdir", { skip }, () => {
     }
   });
 
-  it("mkdir on existing path throws XRootDError code 3018", async () => {
+  it("mkdir on existing path with different mode throws 3018", async () => {
     const { transport, mux, session } = await createConnectedLowLevel();
+    const dirPath = `${TEST_WRITE_DIR}/mkdir-mode-conflict-${randomTestId()}`;
     try {
       const fs = new FileSystem(mux);
+      await fs.mkdir(dirPath, 0o700);
       try {
-        await fs.mkdir(TEST_WRITE_DIR);
+        await fs.mkdir(dirPath, 0o755);
         assert.fail("Expected XRootDError");
       } catch (err) {
         assert.ok(err instanceof XRootDError, "should throw XRootDError");
         assert.equal(err.code, 3018, "error code should be 3018 (ItExists)");
       }
+    } finally {
+      await closeLowLevel({ transport, mux, session });
+    }
+  });
+
+  it("mkdir on existing path with same mode succeeds (idempotent)", async () => {
+    const { transport, mux, session } = await createConnectedLowLevel();
+    const dirPath = `${TEST_WRITE_DIR}/mkdir-idempotent-${randomTestId()}`;
+    try {
+      const fs = new FileSystem(mux);
+      await fs.mkdir(dirPath, 0o755);
+      await fs.mkdir(dirPath, 0o755);
     } finally {
       await closeLowLevel({ transport, mux, session });
     }
