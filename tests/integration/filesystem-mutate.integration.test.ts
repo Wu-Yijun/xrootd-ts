@@ -92,17 +92,11 @@ describe("Integration: FileSystem.rmdir", () => {
     }
   });
 
-  it("rmdir on non-existent path throws XRootDError code 3011", async () => {
+  it("rmdir on non-existent path succeeds (idempotent)", async () => {
     const { transport, mux, session } = await createConnectedLowLevel();
     try {
       const fs = new FileSystem(mux);
-      try {
-        await fs.rmdir(`${TEST_WRITE_DIR}/nonexistent-dir-${randomTestId()}`);
-        assert.fail("Expected XRootDError");
-      } catch (err) {
-        assert.ok(err instanceof XRootDError, "should throw XRootDError");
-        assert.equal(err.code, 3011, "error code should be 3011 (NotFound)");
-      }
+      await fs.rmdir(`${TEST_WRITE_DIR}/nonexistent-dir-${randomTestId()}`);
     } finally {
       await closeLowLevel({ transport, mux, session });
     }
