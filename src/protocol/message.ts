@@ -6,15 +6,14 @@ import {
   HANDSHAKE_THIRD,
   PROTOCOL_VERSION,
   REQUEST_HDR_SIZE,
+  RequestId,
+  kXR_ExpLogin,
+  kXR_secreqs,
 } from "./constants.ts";
 import {
   get32,
   getBytes,
   getString,
-  put16,
-  put32,
-  putBytes,
-  putString,
 } from "./codec.ts";
 
 // ── Response interfaces ────────────────────────────────────────────────────
@@ -126,8 +125,8 @@ function strToBytes(str: string): Uint8Array {
  */
 export function buildHandshakeAndProtocol(
   streamId: number,
-  flags: number = 0x01, // kXR_secreqs
-  expect: number = 0x01, // kXR_ExpLogin
+  flags: number = kXR_secreqs,
+  expect: number = kXR_ExpLogin,
 ): Buffer {
   const msg = new Message(20 + REQUEST_HDR_SIZE);
 
@@ -142,7 +141,7 @@ export function buildHandshakeAndProtocol(
   // streamid
   msg.writeBytes(streamIdToBytes(streamId));
   // requestid
-  msg.writeInt16BE(3006); // RequestId.Protocol
+  msg.writeInt16BE(RequestId.Protocol);
   // body.clientpv (4 B)
   msg.writeInt32BE(PROTOCOL_VERSION);
   // body.flags (1 B)
@@ -175,7 +174,7 @@ export function buildLoginRequest(
 
   // header
   msg.writeBytes(streamIdToBytes(streamId));
-  msg.writeInt16BE(3007); // RequestId.Login
+  msg.writeInt16BE(RequestId.Login);
 
   // body
   msg.writeInt32BE(pid);
@@ -218,7 +217,7 @@ export function buildOpenRequest(
 
   // header
   msg.writeBytes(streamIdToBytes(streamId));
-  msg.writeInt16BE(3010); // RequestId.Open
+  msg.writeInt16BE(RequestId.Open);
 
   // body
   msg.writeInt16BE(mode & 0xffff);
@@ -252,7 +251,7 @@ export function buildReadRequest(
 
   // header
   msg.writeBytes(streamIdToBytes(streamId));
-  msg.writeInt16BE(3013); // RequestId.Read
+  msg.writeInt16BE(RequestId.Read);
 
   // body
   msg.writeBytes(fhandle);
@@ -283,7 +282,7 @@ export function buildWriteRequest(
 
   // header
   msg.writeBytes(streamIdToBytes(streamId));
-  msg.writeInt16BE(3019); // RequestId.Write
+  msg.writeInt16BE(RequestId.Write);
 
   // body
   msg.writeBytes(fhandle);
@@ -315,7 +314,7 @@ export function buildCloseRequest(
 
   // header
   msg.writeBytes(streamIdToBytes(streamId));
-  msg.writeInt16BE(3003); // RequestId.Close
+  msg.writeInt16BE(RequestId.Close);
 
   // body
   msg.writeBytes(fhandle);
@@ -343,7 +342,7 @@ export function buildStatRequest(
 
   // header
   msg.writeBytes(streamIdToBytes(streamId));
-  msg.writeInt16BE(3017); // RequestId.Stat
+  msg.writeInt16BE(RequestId.Stat);
 
   // body
   if (fhandle) {
@@ -483,7 +482,7 @@ export function buildSyncRequest(
 
   // header
   msg.writeBytes(streamIdToBytes(streamId));
-  msg.writeInt16BE(3016); // RequestId.Sync
+  msg.writeInt16BE(RequestId.Sync);
 
   // body
   msg.writeBytes(fhandle);
@@ -512,7 +511,7 @@ export function buildTruncateRequest(
 
   // header
   msg.writeBytes(streamIdToBytes(streamId));
-  msg.writeInt16BE(3028); // RequestId.Truncate
+  msg.writeInt16BE(RequestId.Truncate);
 
   // body
   msg.writeBytes(fhandle);
@@ -544,7 +543,7 @@ export function buildDirlistRequest(
 
   // header
   msg.writeBytes(streamIdToBytes(streamId));
-  msg.writeInt16BE(3004); // RequestId.Dirlist
+  msg.writeInt16BE(RequestId.Dirlist);
 
   // body
   msg.writeBytes(new Uint8Array(15)); // reserved
@@ -575,7 +574,7 @@ export function buildMkdirRequest(
 
   // header
   msg.writeBytes(streamIdToBytes(streamId));
-  msg.writeInt16BE(3008); // RequestId.Mkdir
+  msg.writeInt16BE(RequestId.Mkdir);
 
   // body
   msg.writeInt16BE(mode & 0xffff);
@@ -605,7 +604,7 @@ export function buildRmdirRequest(
 
   // header
   msg.writeBytes(streamIdToBytes(streamId));
-  msg.writeInt16BE(3015); // RequestId.Rmdir
+  msg.writeInt16BE(RequestId.Rmdir);
 
   // body
   msg.writeBytes(new Uint8Array(16)); // reserved
@@ -634,7 +633,7 @@ export function buildRmRequest(
 
   // header
   msg.writeBytes(streamIdToBytes(streamId));
-  msg.writeInt16BE(3014); // RequestId.Rm
+  msg.writeInt16BE(RequestId.Rm);
 
   // body
   msg.writeBytes(new Uint8Array(16)); // reserved
@@ -667,7 +666,7 @@ export function buildMvRequest(
 
   // header
   msg.writeBytes(streamIdToBytes(streamId));
-  msg.writeInt16BE(3009); // RequestId.Mv
+  msg.writeInt16BE(RequestId.Mv);
 
   // body
   msg.writeBytes(new Uint8Array(14)); // reserved
@@ -698,7 +697,7 @@ export function buildAuthRequest(
 
   // header
   msg.writeBytes(streamIdToBytes(streamId));
-  msg.writeInt16BE(3000); // RequestId.Auth
+  msg.writeInt16BE(RequestId.Auth);
 
   // body
   msg.writeBytes(new Uint8Array(12)); // reserved
@@ -727,7 +726,7 @@ export function buildEndsessRequest(
 
   // header
   msg.writeBytes(streamIdToBytes(streamId));
-  msg.writeInt16BE(3023); // RequestId.Endsess
+  msg.writeInt16BE(RequestId.Endsess);
 
   // body
   msg.writeBytes(sessid);
