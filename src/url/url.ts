@@ -33,15 +33,7 @@ export class XRootDUrl {
   }
 
   toString(): string {
-    let auth = "";
-    if (this.user) {
-      auth = this.user;
-      if (this.password) {
-        auth += ":" + this.password;
-      }
-      auth += "@";
-    }
-
+    const auth = this.getAuthString();
     const portStr = this.port === DEFAULT_PORT ? "" : `:${this.port}`;
     return `${this.protocol}://${auth}${this.host}${portStr}${this.path}`;
   }
@@ -55,14 +47,7 @@ export class XRootDUrl {
   }
 
   getHostId(): string {
-    let auth = "";
-    if (this.user) {
-      auth = this.user;
-      if (this.password) {
-        auth += ":" + this.password;
-      }
-      auth += "@";
-    }
+    const auth = this.getAuthString();
     return `${auth}${this.host}:${this.port}`;
   }
 
@@ -72,5 +57,14 @@ export class XRootDUrl {
 
   getLocation(): string {
     return `${this.protocol}://${this.host}:${this.port}${this.path}`;
+  }
+
+  private getAuthString(): string {
+    if (!this.user) return "";
+    let auth = this.user;
+    if (this.password) {
+      auth += ":" + this.password;
+    }
+    return auth + "@";
   }
 }
