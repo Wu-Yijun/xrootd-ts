@@ -3,7 +3,7 @@ import { type Frame, Framer } from "./framer.ts";
 import { Message } from "../protocol/message.ts";
 import { ClientError, ResponseStatus } from "../protocol/constants.ts";
 import { parseRedirectResponse } from "../protocol/message.ts";
-import { streamIdToBytes, bytesToStreamId } from "../utils/bytes.ts";
+import { bytesToStreamId, streamIdToBytes } from "../utils/bytes.ts";
 import { XRootDError } from "../api/errors.ts";
 
 interface PendingRequest {
@@ -118,7 +118,10 @@ export class Multiplexer {
   private handleFrame(frame: Frame): void {
     const sid = bytesToStreamId(frame.streamId);
 
-    if (frame.status === ResponseStatus.Wait || frame.status === ResponseStatus.Waitresp) {
+    if (
+      frame.status === ResponseStatus.Wait ||
+      frame.status === ResponseStatus.Waitresp
+    ) {
       this.handleWaitResponse(sid, frame);
       return;
     }

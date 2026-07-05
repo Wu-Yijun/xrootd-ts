@@ -6,10 +6,10 @@ import type {
 import type { Multiplexer } from "../transport/multiplexer.ts";
 import {
   ClientError,
+  CRED_TYPE,
   RequestId,
   ResponseStatus,
   ServerError,
-  CRED_TYPE,
 } from "../protocol/constants.ts";
 import { parseErrorResponse } from "../protocol/message.ts";
 import { XRootDError } from "../api/errors.ts";
