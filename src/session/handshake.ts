@@ -15,8 +15,7 @@ import {
   parseProtocolResponse,
   parseRedirectResponse,
 } from "../protocol/message.ts";
-import { type Frame, Framer } from "../transport/framer.ts";
-import type { ITransport } from "../transport/interface.ts";
+import { createFrameReader } from "../utils/frame-reader.ts";
 
 export interface Session {
   sessid: Uint8Array;
@@ -112,45 +111,4 @@ export async function handshake(
   } finally {
     reader.close();
   }
-}
-
-/**
- * Creates a persistent frame reader that registers ONE onData handler
- * before any data is sent, avoiding the race condition where the
- * Multiplexer's handler consumes frames before the handshake can read them.
- *
- * Uses a queue pattern: incoming frames are queued, and nextFrame()
- * resolves the next available frame (or waits for one to arrive).
- */
-function createFrameReader(transport: ITransport) {
-  const framer = new Framer();
-  const frameQueue: Frame[] = [];
-  const waiters: Array<(frame: Frame) => void> = [];
-
-  const handler = (chunk: Buffer) => {
-    const frames = framer.feed(chunk);
-    for (const frame of frames) {
-      if (waiters.length > 0) {
-        waiters.shift()!(frame);
-      } else {
-        frameQueue.push(frame);
-      }
-    }
-  };
-
-  transport.onData(handler);
-
-  return {
-    nextFrame(): Promise<Frame> {
-      if (frameQueue.length > 0) {
-        return Promise.resolve(frameQueue.shift()!);
-      }
-      return new Promise<Frame>((resolve) => {
-        waiters.push(resolve);
-      });
-    },
-    close() {
-      transport.removeDataHandler(handler);
-    },
-  };
 }
