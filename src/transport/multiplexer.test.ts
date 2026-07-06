@@ -183,14 +183,22 @@ describe("Multiplexer", () => {
     it("redirect detaches pending and passes to onRedirect", async () => {
       let redirectHost = "";
       let redirectPort = 0;
-      let receivedPending: { requestId: number; body: Uint8Array; data?: Uint8Array } | null = null;
+      let receivedPending: {
+        requestId: number;
+        body: Uint8Array;
+        data?: Uint8Array;
+      } | null = null;
 
       const redirectMux = new Multiplexer(transport, {
         maxRedirects: 16,
         onRedirect: async (host, port, pending) => {
           redirectHost = host;
           redirectPort = port;
-          receivedPending = { requestId: pending.requestId, body: pending.body, data: pending.data };
+          receivedPending = {
+            requestId: pending.requestId,
+            body: pending.body,
+            data: pending.data,
+          };
           // Simulate client retry: resend on same mux
           redirectMux.request(pending.requestId, pending.body, pending.data)
             .then(pending.resolve)

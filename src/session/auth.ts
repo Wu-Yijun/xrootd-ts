@@ -54,7 +54,9 @@ export async function doAuthentication(
 
   throw new XRootDError(
     ServerError.AuthFailed,
-    `All authentication methods failed. Server requires: ${authProtocols.join(", ")}` +
+    `All authentication methods failed. Server requires: ${
+      authProtocols.join(", ")
+    }` +
       (filter ? `. Allowed: ${filter.join(",")}` : "") +
       (lastError ? `. Last error: ${lastError.message}` : ""),
   );

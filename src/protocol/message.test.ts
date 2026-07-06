@@ -253,8 +253,10 @@ describe("parseProtocolResponse", () => {
     body[11] = 0;
     body[12] = 3; // seclvl (intense)
     body[13] = 2; // secvsz = 2 entries
-    body[14] = 0; body[15] = 1; // secvec[0]
-    body[16] = 1; body[17] = 2; // secvec[1]
+    body[14] = 0;
+    body[15] = 1; // secvec[0]
+    body[16] = 1;
+    body[17] = 2; // secvec[1]
     const resp = parseProtocolResponse(body);
     assert.equal(resp.seclvl, 3);
   });

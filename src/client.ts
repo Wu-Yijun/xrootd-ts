@@ -14,7 +14,11 @@ import type { Session } from "./session/handshake.ts";
 import type { StatInfo } from "./api/types.ts";
 import type { DirectoryList } from "./api/types.ts";
 import { XRootDError } from "./api/errors.ts";
-import { ClientError, OpenFlags, DEFAULT_MAX_REDIRECTS } from "./protocol/constants.ts";
+import {
+  ClientError,
+  DEFAULT_MAX_REDIRECTS,
+  OpenFlags,
+} from "./protocol/constants.ts";
 import type { SecEnv } from "./config/sec-env.ts";
 import { loadAuthConfig } from "./config/loader.ts";
 
@@ -54,12 +58,18 @@ export class XRootDClient {
 
   private async doConnect(url: XRootDUrl): Promise<void> {
     this.transport = new Transport();
-    await this.transport.connect(url.host, url.port, url.isSecure(), this.options.tls);
+    await this.transport.connect(
+      url.host,
+      url.port,
+      url.isSecure(),
+      this.options.tls,
+    );
 
     this.mux = new Multiplexer(this.transport, {
       maxRedirects: this.options.maxRedirects ?? DEFAULT_MAX_REDIRECTS,
       redirectCount: this.redirectCount,
-      onRedirect: (host, port, pending) => this.handleRedirect(host, port, pending),
+      onRedirect: (host, port, pending) =>
+        this.handleRedirect(host, port, pending),
     });
 
     if (this.options.timeout) {
@@ -106,12 +116,21 @@ export class XRootDClient {
     }
 
     this.fs = new FileSystem(() => {
-      if (!this.mux) throw new XRootDError(ClientError.Uninitialized, "Client not connected");
+      if (!this.mux) {
+        throw new XRootDError(
+          ClientError.Uninitialized,
+          "Client not connected",
+        );
+      }
       return this.mux;
     });
   }
 
-  private async handleRedirect(host: string, port: number, pending: DetachedRequest): Promise<void> {
+  private async handleRedirect(
+    host: string,
+    port: number,
+    pending: DetachedRequest,
+  ): Promise<void> {
     // Capture accumulated redirect count before destroying old mux
     if (this.mux) {
       this.redirectCount = this.mux.getRedirectCount();
@@ -131,7 +150,7 @@ export class XRootDClient {
     // Server returns e.g. "eos07.ihep.ac.cn?&cap.sym=...&cap.msg=..."
     let urlStr: string;
     let opaqueQuery = "";
-    const qIndex = host.indexOf('?');
+    const qIndex = host.indexOf("?");
     if (qIndex !== -1) {
       const hostname = host.substring(0, qIndex);
       opaqueQuery = host.substring(qIndex);
@@ -158,7 +177,10 @@ export class XRootDClient {
       }
 
       if (!this.mux) {
-        throw new XRootDError(ClientError.Uninitialized, "Client not connected after redirect");
+        throw new XRootDError(
+          ClientError.Uninitialized,
+          "Client not connected after redirect",
+        );
       }
       this.mux.request(pending.requestId, pending.body, requestData)
         .then(pending.resolve)
@@ -196,7 +218,10 @@ export class XRootDClient {
     return this.ensureFileSystem().stat(path);
   }
 
-  async readdir(path: string, options?: { dstat?: boolean }): Promise<DirectoryList> {
+  async readdir(
+    path: string,
+    options?: { dstat?: boolean },
+  ): Promise<DirectoryList> {
     return this.ensureFileSystem().readdir(path, options);
   }
 

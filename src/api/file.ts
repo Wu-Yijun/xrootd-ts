@@ -14,7 +14,7 @@ import {
   ResponseStatus,
   ServerError,
 } from "../protocol/constants.ts";
-import { XRootDError, assertOkFrame } from "./errors.ts";
+import { assertOkFrame, XRootDError } from "./errors.ts";
 import { createStatInfo, type StatInfo } from "./types.ts";
 import { sendRequest } from "../utils/request.ts";
 

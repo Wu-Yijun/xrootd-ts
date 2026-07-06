@@ -138,7 +138,9 @@ export async function handshake(
       protocolVersion: protoResp.pval,
       seclvl: protoResp.seclvl,
       bifReqs: protoResp.bifReqs,
-      authProtocols: loginResp.secToken ? parseSecToken(loginResp.secToken) : undefined,
+      authProtocols: loginResp.secToken
+        ? parseSecToken(loginResp.secToken)
+        : undefined,
       needsAuth: loginResp.needsAuth,
       spnPrefix,
     };

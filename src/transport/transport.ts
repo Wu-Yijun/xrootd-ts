@@ -2,10 +2,10 @@ import net from "node:net";
 import tls from "node:tls";
 import type { ITransport } from "./interface.ts";
 
-const DEBUG = ()=> process?.env?.DEBUG === "true";
+const DEBUG = () => process?.env?.DEBUG === "true";
 
 function DEBUG_to_ascii(buf: Buffer): string {
-  const p = buf.map(byte => {
+  const p = buf.map((byte) => {
     // Check if byte is a printable ASCII character (32 = space, 126 = ~)
     if (byte >= 32 && byte <= 126) {
       return byte; // Keep the byte
@@ -23,7 +23,12 @@ export class Transport implements ITransport {
   private dataHandlers: ((chunk: Buffer) => void)[] = [];
   private dataListenerInstalled = false;
 
-  async connect(host: string, port: number, useTls = false, tlsOptions?: { rejectUnauthorized?: boolean }): Promise<void> {
+  async connect(
+    host: string,
+    port: number,
+    useTls = false,
+    tlsOptions?: { rejectUnauthorized?: boolean },
+  ): Promise<void> {
     this.socket = useTls
       ? await this.tlsConnect(host, port, tlsOptions)
       : await this.tcpConnect(host, port);
@@ -37,7 +42,12 @@ export class Transport implements ITransport {
     });
 
     this.socket.on("data", (chunk: Buffer) => {
-      if (DEBUG()) console.log(`Transport.onData: received ${chunk.length} bytes: `, chunk);
+      if (DEBUG()) {
+        console.log(
+          `Transport.onData: received ${chunk.length} bytes: `,
+          chunk,
+        );
+      }
       if (DEBUG()) console.log(`  Received Ascii: `, DEBUG_to_ascii(chunk));
       for (const handler of this.dataHandlers) {
         handler(chunk);
@@ -47,7 +57,9 @@ export class Transport implements ITransport {
   }
 
   send(data: Buffer): Promise<void> {
-    if (DEBUG()) console.log(`Transport.send: sending ${data.length} bytes: `, data);
+    if (DEBUG()) {
+      console.log(`Transport.send: sending ${data.length} bytes: `, data);
+    }
     if (DEBUG()) console.log(`  Send Ascii: `, DEBUG_to_ascii(data));
     return new Promise((resolve, reject) => {
       this.socket!.write(data, (err) => (err ? reject(err) : resolve()));
@@ -89,10 +101,18 @@ export class Transport implements ITransport {
     });
   }
 
-  private tlsConnect(host: string, port: number, tlsOptions?: { rejectUnauthorized?: boolean }): Promise<tls.TLSSocket> {
+  private tlsConnect(
+    host: string,
+    port: number,
+    tlsOptions?: { rejectUnauthorized?: boolean },
+  ): Promise<tls.TLSSocket> {
     return new Promise((resolve, reject) => {
       const socket = tls.connect(
-        { host, port, rejectUnauthorized: tlsOptions?.rejectUnauthorized ?? false },
+        {
+          host,
+          port,
+          rejectUnauthorized: tlsOptions?.rejectUnauthorized ?? false,
+        },
         () => resolve(socket),
       );
       socket.once("error", reject);

@@ -2,7 +2,7 @@
 // NOTE: RequestId values overlap with ServerError values (both start at 3000).
 // This is by protocol design — they are distinguished by response context.
 export const RequestId = {
-  Auth: 3000,       // same value as ServerError.ArgInvalid (different context)
+  Auth: 3000, // same value as ServerError.ArgInvalid (different context)
   Query: 3001,
   Chmod: 3002,
   Close: 3003,

@@ -8,7 +8,7 @@ import {
   buildStatRequest,
   parseDirlistResponse,
 } from "../protocol/message.ts";
-import { DirlistOptions, DEFAULT_DIR_MODE } from "../protocol/constants.ts";
+import { DEFAULT_DIR_MODE, DirlistOptions } from "../protocol/constants.ts";
 import { assertOkFrame } from "./errors.ts";
 import type { DirectoryList, StatInfo } from "./types.ts";
 import { createStatInfo } from "./types.ts";
@@ -28,7 +28,10 @@ export class FileSystem {
     return createStatInfo(frame.body.toString("utf8"));
   }
 
-  async readdir(path: string, options?: { dstat?: boolean }): Promise<DirectoryList> {
+  async readdir(
+    path: string,
+    options?: { dstat?: boolean },
+  ): Promise<DirectoryList> {
     const flags = options?.dstat ? DirlistOptions.Dstat : 0;
     const req = buildDirlistRequest(0, path, flags);
     const frame = await sendRequest(this.getMux(), req);

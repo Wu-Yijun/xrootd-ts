@@ -1,7 +1,15 @@
 import type { ITransport } from "./interface.ts";
 import { type Frame, Framer } from "./framer.ts";
 import { Message } from "../protocol/message.ts";
-import { ClientError, ResponseStatus, AttnAction, MAX_STREAM_ID, DEFAULT_TIMEOUT, DEFAULT_MAX_REDIRECTS, MS_PER_SEC } from "../protocol/constants.ts";
+import {
+  AttnAction,
+  ClientError,
+  DEFAULT_MAX_REDIRECTS,
+  DEFAULT_TIMEOUT,
+  MAX_STREAM_ID,
+  MS_PER_SEC,
+  ResponseStatus,
+} from "../protocol/constants.ts";
 import { parseRedirectResponse } from "../protocol/message.ts";
 import { bytesToStreamId, streamIdToBytes } from "../utils/bytes.ts";
 import { XRootDError } from "../api/errors.ts";
@@ -26,7 +34,11 @@ export interface DetachedRequest {
 export interface MultiplexerOptions {
   maxRedirects?: number;
   redirectCount?: number;
-  onRedirect?: (host: string, port: number, pending: DetachedRequest) => Promise<void>;
+  onRedirect?: (
+    host: string,
+    port: number,
+    pending: DetachedRequest,
+  ) => Promise<void>;
 }
 
 /**
@@ -46,7 +58,11 @@ export class Multiplexer {
   private closed = false;
   private redirectCount = 0;
   private maxRedirects: number;
-  private onRedirect?: (host: string, port: number, pending: DetachedRequest) => Promise<void>;
+  private onRedirect?: (
+    host: string,
+    port: number,
+    pending: DetachedRequest,
+  ) => Promise<void>;
 
   constructor(transport: ITransport, options?: MultiplexerOptions) {
     this.transport = transport;
@@ -55,7 +71,10 @@ export class Multiplexer {
     this.redirectCount = options?.redirectCount ?? 0;
     this.onRedirect = options?.onRedirect;
 
-    this.sweepTimer = globalThis.setInterval(() => this.sweepTimeouts(), MS_PER_SEC);
+    this.sweepTimer = globalThis.setInterval(
+      () => this.sweepTimeouts(),
+      MS_PER_SEC,
+    );
     this.sweepTimer.unref();
 
     this.transport.onData((chunk) => {
@@ -198,14 +217,21 @@ export class Multiplexer {
     });
   }
 
-  private handleWaitResponse(sid: number, frame: Frame, shouldRetry: boolean): void {
+  private handleWaitResponse(
+    sid: number,
+    frame: Frame,
+    shouldRetry: boolean,
+  ): void {
     const seconds = frame.body.readInt32BE(0);
     const pending = this.pending.get(sid);
     if (pending) {
       pending.expiresAt = Date.now() + seconds * MS_PER_SEC + this.timeout;
       if (shouldRetry) {
         // kXR_wait: server is busy, retry after the specified delay
-        globalThis.setTimeout(() => this.retryRequest(sid), seconds * MS_PER_SEC);
+        globalThis.setTimeout(
+          () => this.retryRequest(sid),
+          seconds * MS_PER_SEC,
+        );
       }
       // kXR_waitresp: server is processing, do NOT retry.
       // Wait for the kXR_attn async response to arrive.

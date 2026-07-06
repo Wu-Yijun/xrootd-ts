@@ -54,7 +54,10 @@ export function parseProtocolResponse(body: Buffer): ProtocolResponse {
       const [bifILen, lenOff] = get16(body, off + 2);
       off = lenOff;
       if (bifILen > 0 && off + bifILen <= body.length) {
-        const raw = body.toString("utf8", off, off + bifILen).replace(/\0+$/, "");
+        const raw = body.toString("utf8", off, off + bifILen).replace(
+          /\0+$/,
+          "",
+        );
         if (raw) bifReqs = raw;
         off += bifILen;
       } else {

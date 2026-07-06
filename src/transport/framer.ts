@@ -31,7 +31,10 @@ export class Framer {
         streamId: this.pending.subarray(0, 2),
         status: this.pending.readUInt16BE(2),
         dlen,
-        body: this.pending.subarray(RESPONSE_HDR_SIZE, RESPONSE_HDR_SIZE + dlen),
+        body: this.pending.subarray(
+          RESPONSE_HDR_SIZE,
+          RESPONSE_HDR_SIZE + dlen,
+        ),
       });
       this.pending = this.pending.subarray(RESPONSE_HDR_SIZE + dlen);
     }

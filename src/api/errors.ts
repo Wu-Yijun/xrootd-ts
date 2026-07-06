@@ -1,4 +1,8 @@
-import { ClientError, ResponseStatus, ServerError } from "../protocol/constants.ts";
+import {
+  ClientError,
+  ResponseStatus,
+  ServerError,
+} from "../protocol/constants.ts";
 import type { Frame } from "../transport/framer.ts";
 import { parseErrorResponse } from "../protocol/message.ts";
 
