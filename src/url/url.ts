@@ -1,12 +1,12 @@
 import { DEFAULT_PORT } from "../protocol/constants.ts";
 
 export class XRootDUrl {
-  protocol: string;
-  user?: string;
-  password?: string;
-  host: string;
-  port: number;
-  path: string;
+  readonly protocol: string;
+  readonly user?: string;
+  readonly password?: string;
+  readonly host: string;
+  readonly port: number;
+  readonly path: string;
 
   constructor(url: string) {
     const normalized = url.startsWith("root://") || url.startsWith("roots://")
