@@ -1,7 +1,7 @@
 import type { ITransport } from "./interface.ts";
 import { type Frame, Framer } from "./framer.ts";
 import { Message } from "../protocol/message.ts";
-import { ClientError, ResponseStatus } from "../protocol/constants.ts";
+import { ClientError, ResponseStatus, AttnAction, MAX_STREAM_ID, DEFAULT_TIMEOUT, DEFAULT_MAX_REDIRECTS, MS_PER_SEC } from "../protocol/constants.ts";
 import { parseRedirectResponse } from "../protocol/message.ts";
 import { bytesToStreamId, streamIdToBytes } from "../utils/bytes.ts";
 import { XRootDError } from "../api/errors.ts";
@@ -41,7 +41,7 @@ export class Multiplexer {
   private framer: Framer;
   private pending = new Map<number, PendingRequest>();
   private nextStreamId = 0;
-  private timeout = 30000;
+  private timeout = DEFAULT_TIMEOUT;
   private sweepTimer: ReturnType<typeof globalThis.setInterval> | null = null;
   private closed = false;
   private redirectCount = 0;
@@ -51,11 +51,11 @@ export class Multiplexer {
   constructor(transport: ITransport, options?: MultiplexerOptions) {
     this.transport = transport;
     this.framer = new Framer();
-    this.maxRedirects = options?.maxRedirects ?? 16;
+    this.maxRedirects = options?.maxRedirects ?? DEFAULT_MAX_REDIRECTS;
     this.redirectCount = options?.redirectCount ?? 0;
     this.onRedirect = options?.onRedirect;
 
-    this.sweepTimer = globalThis.setInterval(() => this.sweepTimeouts(), 1000);
+    this.sweepTimer = globalThis.setInterval(() => this.sweepTimeouts(), MS_PER_SEC);
     this.sweepTimer.unref();
 
     this.transport.onData((chunk) => {
@@ -77,7 +77,7 @@ export class Multiplexer {
   private allocateStreamId(): number {
     let sid = this.nextStreamId;
     while (this.pending.has(sid)) {
-      sid = (sid + 1) & 0xffff;
+      sid = (sid + 1) & MAX_STREAM_ID;
       if (sid === this.nextStreamId) {
         throw new XRootDError(
           ClientError.InternalError,
@@ -85,7 +85,7 @@ export class Multiplexer {
         );
       }
     }
-    this.nextStreamId = (sid + 1) & 0xffff;
+    this.nextStreamId = (sid + 1) & MAX_STREAM_ID;
     return sid;
   }
 
@@ -128,11 +128,21 @@ export class Multiplexer {
   private handleFrame(frame: Frame): void {
     const sid = bytesToStreamId(frame.streamId);
 
-    if (
-      frame.status === ResponseStatus.Wait ||
-      frame.status === ResponseStatus.Waitresp
-    ) {
-      this.handleWaitResponse(sid, frame);
+    // Intercept kXR_attn (4001) responses — these carry async results
+    if (frame.status === ResponseStatus.Attn) {
+      this.handleAttnResponse(frame);
+      return;
+    }
+
+    if (frame.status === ResponseStatus.Wait) {
+      // kXR_wait: server is busy, client MUST retry later
+      this.handleWaitResponse(sid, frame, true);
+      return;
+    }
+
+    if (frame.status === ResponseStatus.Waitresp) {
+      // kXR_waitresp: server is processing, client MUST NOT retry
+      this.handleWaitResponse(sid, frame, false);
       return;
     }
 
@@ -147,13 +157,58 @@ export class Multiplexer {
     pending.resolve(frame);
   }
 
-  private handleWaitResponse(sid: number, frame: Frame): void {
+  /**
+   * Handle kXR_attn (4001) response.
+   *
+   * When action code is kXR_asynresp (5008), the body contains an embedded
+   * response header with the original streamId and status:
+   *
+   * Body layout (offsets from body start):
+   *   actnum[4]     - action code (5008 = kXR_asynresp)
+   *   reserved[4]   - zeros
+   *   streamid[2]   - original request's streamId
+   *   status[2]     - actual response status
+   *   dlen[4]       - response body length
+   *   respdata[N]   - response body (may be empty)
+   */
+  private handleAttnResponse(frame: Frame): void {
+    if (frame.body.length < 16) return;
+
+    const actnum = frame.body.readUInt32BE(0);
+    if (actnum !== AttnAction.AsyncResp) return;
+
+    const origSid = frame.body.readUInt16BE(8);
+    const innerStatus = frame.body.readUInt16BE(10);
+    const innerDlen = frame.body.readUInt32BE(12);
+
+    const pending = this.pending.get(origSid);
+    if (!pending) return;
+    this.pending.delete(origSid);
+
+    // Resolve with a synthetic frame containing the embedded response
+    const innerBody = innerDlen > 0
+      ? frame.body.subarray(16, 16 + innerDlen)
+      : Buffer.alloc(0);
+
+    pending.resolve({
+      streamId: frame.body.subarray(8, 10),
+      status: innerStatus,
+      dlen: innerDlen,
+      body: innerBody,
+    });
+  }
+
+  private handleWaitResponse(sid: number, frame: Frame, shouldRetry: boolean): void {
     const seconds = frame.body.readInt32BE(0);
     const pending = this.pending.get(sid);
     if (pending) {
-      pending.expiresAt = Date.now() + seconds * 1000 + this.timeout;
-      // globalThis.setTimeout(() => this.retryRequest(sid), seconds * 1000).unref();
-      globalThis.setTimeout(() => this.retryRequest(sid), seconds * 1000);
+      pending.expiresAt = Date.now() + seconds * MS_PER_SEC + this.timeout;
+      if (shouldRetry) {
+        // kXR_wait: server is busy, retry after the specified delay
+        globalThis.setTimeout(() => this.retryRequest(sid), seconds * MS_PER_SEC);
+      }
+      // kXR_waitresp: server is processing, do NOT retry.
+      // Wait for the kXR_attn async response to arrive.
     }
   }
 

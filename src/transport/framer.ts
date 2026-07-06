@@ -1,3 +1,5 @@
+import { RESPONSE_HDR_SIZE } from "../protocol/constants.ts";
+
 /** Complete XRootD response frame */
 export interface Frame {
   streamId: Buffer;
@@ -21,17 +23,17 @@ export class Framer {
     this.pending = Buffer.concat([this.pending, chunk]);
     const frames: Frame[] = [];
 
-    while (this.pending.length >= 8) {
+    while (this.pending.length >= RESPONSE_HDR_SIZE) {
       const dlen = this.pending.readUInt32BE(4);
-      if (this.pending.length < 8 + dlen) break;
+      if (this.pending.length < RESPONSE_HDR_SIZE + dlen) break;
 
       frames.push({
         streamId: this.pending.subarray(0, 2),
         status: this.pending.readUInt16BE(2),
         dlen,
-        body: this.pending.subarray(8, 8 + dlen),
+        body: this.pending.subarray(RESPONSE_HDR_SIZE, RESPONSE_HDR_SIZE + dlen),
       });
-      this.pending = this.pending.subarray(8 + dlen);
+      this.pending = this.pending.subarray(RESPONSE_HDR_SIZE + dlen);
     }
 
     return frames;

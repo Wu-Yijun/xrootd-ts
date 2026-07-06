@@ -14,7 +14,7 @@ import type { Session } from "./session/handshake.ts";
 import type { StatInfo } from "./api/types.ts";
 import type { DirectoryList } from "./api/types.ts";
 import { XRootDError } from "./api/errors.ts";
-import { ClientError, OpenFlags } from "./protocol/constants.ts";
+import { ClientError, OpenFlags, DEFAULT_MAX_REDIRECTS } from "./protocol/constants.ts";
 import type { SecEnv } from "./config/sec-env.ts";
 import { loadAuthConfig } from "./config/loader.ts";
 
@@ -52,7 +52,7 @@ export class XRootDClient {
     await this.transport.connect(url.host, url.port);
 
     this.mux = new Multiplexer(this.transport, {
-      maxRedirects: this.options.maxRedirects ?? 16,
+      maxRedirects: this.options.maxRedirects ?? DEFAULT_MAX_REDIRECTS,
       redirectCount: this.redirectCount,
       onRedirect: (host, port, pending) => this.handleRedirect(host, port, pending),
     });

@@ -4,6 +4,7 @@
  */
 
 import {
+  DEFAULT_DIR_MODE,
   HANDSHAKE_FIFTH,
   HANDSHAKE_FIRST,
   HANDSHAKE_FOURTH,
@@ -11,6 +12,7 @@ import {
   HANDSHAKE_THIRD,
   kXR_ExpLogin,
   kXR_secreqs,
+  OFFSET_HIGH_SHIFT,
   PROTOCOL_VERSION,
   REQUEST_HDR_SIZE,
   RequestId,
@@ -139,7 +141,7 @@ export function buildReadRequest(
   msg.writeInt16BE(RequestId.Read);
 
   msg.writeBytes(fhandle);
-  msg.writeInt32BE(Math.floor(offset / 0x100000000));
+  msg.writeInt32BE(Math.floor(offset / OFFSET_HIGH_SHIFT));
   msg.writeInt32BE(offset >>> 0);
   msg.writeInt32BE(rlen);
 
@@ -166,7 +168,7 @@ export function buildWriteRequest(
   msg.writeInt16BE(RequestId.Write);
 
   msg.writeBytes(fhandle);
-  msg.writeInt32BE(Math.floor(offset / 0x100000000));
+  msg.writeInt32BE(Math.floor(offset / OFFSET_HIGH_SHIFT));
   msg.writeInt32BE(offset >>> 0);
   msg.writeUInt8(0);
   msg.writeBytes(new Uint8Array(3));
@@ -280,7 +282,7 @@ export function buildTruncateRequest(
   msg.writeBytes(new Uint8Array(12));
 
   msg.writeInt32BE(8);
-  msg.writeInt32BE(Math.floor(size / 0x100000000));
+  msg.writeInt32BE(Math.floor(size / OFFSET_HIGH_SHIFT));
   msg.writeInt32BE(size >>> 0);
 
   return msg.getBuffer();
@@ -321,7 +323,7 @@ export function buildDirlistRequest(
 export function buildMkdirRequest(
   streamId: number,
   path: string,
-  mode: number = 0o755,
+  mode: number = DEFAULT_DIR_MODE,
 ): Buffer {
   const pathBytes = strToBytes(path);
   const msg = new Message(REQUEST_HDR_SIZE + pathBytes.length);

@@ -10,7 +10,7 @@ import {
   parseDirlistResponse,
   parseErrorResponse,
 } from "../protocol/message.ts";
-import { RequestId, ResponseStatus, DirlistOptions } from "../protocol/constants.ts";
+import { RequestId, ResponseStatus, DirlistOptions, DEFAULT_DIR_MODE } from "../protocol/constants.ts";
 import { XRootDError } from "./errors.ts";
 import type { DirectoryList, StatInfo } from "./types.ts";
 import { createStatInfo } from "./types.ts";
@@ -48,7 +48,7 @@ export class FileSystem {
     return { name: path, entries };
   }
 
-  async mkdir(path: string, mode: number = 0o755): Promise<void> {
+  async mkdir(path: string, mode: number = DEFAULT_DIR_MODE): Promise<void> {
     const req = buildMkdirRequest(0, path, mode);
     const frame = await this.getMux().request(
       RequestId.Mkdir,

@@ -50,6 +50,11 @@ export const ResponseStatus = {
 } as const;
 export type ResponseStatus = typeof ResponseStatus[keyof typeof ResponseStatus];
 
+// ── kXR_attn Action Codes ─────────────────────────────────────────────────
+export const AttnAction = {
+  AsyncResp: 5008,
+} as const;
+
 // ── Server Error Codes (kXR_error body errnum) ─────────────────────────────
 export const ServerError = {
   ArgInvalid: 3000,
@@ -180,6 +185,20 @@ export const kXR_ExpBind = 0x02;
 
 // ── Default XRootD port ───────────────────────────────────────────────────
 export const DEFAULT_PORT = 1094;
+
+// ── Derived / commonly-used values ────────────────────────────────────────
+/** 64-bit offset split: high 32 bits = offset / OFFSET_HIGH_SHIFT */
+export const OFFSET_HIGH_SHIFT = 0x100000000;
+/** Maximum multiplexer timeout (ms) */
+export const DEFAULT_TIMEOUT = 30_000;
+/** Default max redirect count before giving up */
+export const DEFAULT_MAX_REDIRECTS = 16;
+/** Maximum stream ID (uint16) */
+export const MAX_STREAM_ID = 0xffff;
+/** Milliseconds per second (for timer conversions) */
+export const MS_PER_SEC = 1000;
+/** Default POSIX directory mode (octal 755) */
+export const DEFAULT_DIR_MODE = 0o755;
 
 // ── File mode flags ──────────────────────────────────────────────────────
 export const S_IFDIR = 0o040000;
