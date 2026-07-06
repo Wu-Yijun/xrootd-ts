@@ -160,20 +160,23 @@ describe("E2E: redirect auto-handling", () => {
     try {
       const transport = new Transport();
       await transport.connect("127.0.0.1", serverA.port);
-      const mux = new Multiplexer(transport, {
+      let mux = new Multiplexer(transport, {
         maxRedirects: 3,
-        onRedirect: async (host: string, port: number) => {
+        onRedirect: async (host: string, port: number, pending) => {
           mux.close();
           await transport.close();
 
           const t2 = new Transport();
           await t2.connect(host, port);
-          const mux2 = new Multiplexer(t2, { maxRedirects: 3 });
+          mux = new Multiplexer(t2, { maxRedirects: 3 });
 
-          // Copy mux2 internals isn't possible — use a fresh connection approach
-          // Instead, we test that onRedirect was called with correct args
           assert.equal(host, "127.0.0.1");
           assert.equal(port, serverB.port);
+
+          // Retry the original request on the new mux
+          mux.request(pending.requestId, pending.body, pending.data)
+            .then(pending.resolve)
+            .catch(pending.reject);
         },
       });
 
@@ -182,13 +185,11 @@ describe("E2E: redirect auto-handling", () => {
       assert.equal(protoFrame.status, 0);
 
       // Login request - server A redirects to server B
-      // onRedirect is called, then retryRequest tries on same (closed) transport → error
-      try {
-        await mux.request(3007, new Uint8Array(16));
-      } catch (err) {
-        assert.ok(err instanceof Error);
-      }
+      // onRedirect reconnects and retries → should succeed on server B
+      const loginFrame = await mux.request(3007, new Uint8Array(16));
+      assert.equal(loginFrame.status, 0);
 
+      mux.close();
       await transport.close();
     } finally {
       serverA.server.close();
@@ -257,9 +258,12 @@ describe("E2E: redirect auto-handling", () => {
 
       const mux = new Multiplexer(transport, {
         maxRedirects,
-        onRedirect: async () => {
+        onRedirect: async (_host, _port, pending) => {
           redirectCount++;
-          // Simulate reconnect (we stay on same server for this test)
+          // Simulate client retry: resend on same mux
+          mux.request(pending.requestId, pending.body, pending.data)
+            .then(pending.resolve)
+            .catch(pending.reject);
         },
       });
 
@@ -271,8 +275,6 @@ describe("E2E: redirect auto-handling", () => {
       // After maxRedirects, it should reject
       try {
         await mux.request(3007, new Uint8Array(16));
-        // If onRedirect handler is called, it retries. Eventually fails.
-        // The behavior depends on timing - just ensure no crash
       } catch (err) {
         assert.ok(err instanceof Error);
         assert.match(err.message, /redirect/i);
@@ -342,10 +344,19 @@ describe("E2E: redirect auto-handling", () => {
       await transport.connect("127.0.0.1", addr.port);
       const mux = new Multiplexer(transport, {
         maxRedirects: 3,
-        onRedirect: async () => {
+        onRedirect: async (_host, _port, pending) => {
           // Try to connect to unreachable port - should fail
-          const t = new Transport();
-          await t.connect("127.0.0.1", 1);
+          try {
+            const t = new Transport();
+            await t.connect("127.0.0.1", 1);
+            // If somehow connected, retry on new mux
+            mux.request(pending.requestId, pending.body, pending.data)
+              .then(pending.resolve)
+              .catch(pending.reject);
+          } catch {
+            // Connection failed - reject the pending request
+            pending.reject(new Error("Connection to redirect target failed"));
+          }
         },
       });
 
@@ -355,7 +366,6 @@ describe("E2E: redirect auto-handling", () => {
       try {
         // Login request will redirect to unreachable port
         await mux.request(3007, new Uint8Array(16));
-        // If we get here, the redirect handler failed silently
       } catch (err) {
         assert.ok(err instanceof Error);
       }

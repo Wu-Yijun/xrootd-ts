@@ -118,47 +118,44 @@ describe("E2E: redirect flow", () => {
       await transport1.connect("127.0.0.1", addrA.port);
 
       let capturedRedirPort = 0;
+      let mux2: Multiplexer;
+      let transport2: Transport;
+
       const mux1 = new Multiplexer(transport1, {
         maxRedirects: 16,
-        onRedirect: async (host, port) => {
+        onRedirect: async (host, port, pending) => {
           capturedRedirPort = port;
           mux1.close();
           await transport1.close();
+
+          // Connect to server B
+          transport2 = new Transport();
+          await transport2.connect(host, port);
+          mux2 = new Multiplexer(transport2, { maxRedirects: 16 });
+
+          // Retry the original request on the new mux
+          mux2.request(pending.requestId, pending.body, pending.data)
+            .then(pending.resolve)
+            .catch(pending.reject);
         },
       });
 
       const protoFrame = await mux1.request(3006, new Uint8Array(16));
       assert.equal(protoFrame.status, 0);
 
-      await assert.rejects(
-        mux1.request(3007, new Uint8Array(16)),
-        (err: any) => {
-          assert.equal(
-            capturedRedirPort,
-            portB,
-            "onRedirect should have captured the redirect port",
-          );
-          return err instanceof Error && /closed/i.test(err.message);
-        },
-      );
-
-      const transport2 = new Transport();
-      await transport2.connect("127.0.0.1", capturedRedirPort);
-      const mux2 = new Multiplexer(transport2);
-
-      const protoFrame2 = await mux2.request(3006, new Uint8Array(16));
-      assert.equal(protoFrame2.status, 0);
-
-      const loginFrame2 = await mux2.request(3007, new Uint8Array(16));
-      assert.equal(loginFrame2.status, 0);
+      // Login request - server A redirects to server B
+      // onRedirect reconnects and retries → should succeed on server B
+      const loginFrame = await mux1.request(3007, new Uint8Array(16));
+      assert.equal(loginFrame.status, 0);
+      assert.equal(capturedRedirPort, portB);
 
       const session: Session = {
-        sessid: new Uint8Array(loginFrame2.body.subarray(0, 16)),
+        sessid: new Uint8Array(loginFrame.body.subarray(0, 16)),
         protocolVersion: 0x520,
         needsAuth: false,
       };
 
-      const file = new File(mux2, session);
+      const file = new File(mux2!, session);
       await file.open("/data/test.txt", { flags: 0x0010 });
       assert.equal(file.isOpen, true);
 
@@ -169,8 +166,8 @@ describe("E2E: redirect flow", () => {
       await file.close();
       assert.equal(serverBCalled, true);
 
-      mux2.close();
-      await transport2.close();
+      mux2!.close();
+      await transport2!.close();
     } finally {
       serverA.close();
       serverB.close();

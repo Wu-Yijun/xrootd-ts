@@ -180,15 +180,21 @@ describe("Multiplexer", () => {
   });
 
   describe("redirect handling", () => {
-    it("redirect triggers onRedirect callback and retries", async () => {
+    it("redirect detaches pending and passes to onRedirect", async () => {
       let redirectHost = "";
       let redirectPort = 0;
+      let receivedPending: { requestId: number; body: Uint8Array; data?: Uint8Array } | null = null;
 
       const redirectMux = new Multiplexer(transport, {
         maxRedirects: 16,
-        onRedirect: async (host, port) => {
+        onRedirect: async (host, port, pending) => {
           redirectHost = host;
           redirectPort = port;
+          receivedPending = { requestId: pending.requestId, body: pending.body, data: pending.data };
+          // Simulate client retry: resend on same mux
+          redirectMux.request(pending.requestId, pending.body, pending.data)
+            .then(pending.resolve)
+            .catch(pending.reject);
         },
       });
 
@@ -210,9 +216,13 @@ describe("Multiplexer", () => {
 
       assert.equal(redirectHost, "newserver.example.com");
       assert.equal(redirectPort, 1095);
+      assert.ok(receivedPending);
+      assert.equal(receivedPending!.requestId, 3006);
 
-      // The request should have been retried, simulate success
-      transport.simulateResponse(0, Buffer.alloc(0));
+      // The retried request should be on the transport, simulate success
+      const lastReq = transport.sentData[transport.sentData.length - 1];
+      const retrySid = extractStreamId(lastReq);
+      transport.simulateResponseFor(retrySid, 0, Buffer.alloc(0));
       const frame = await responsePromise;
       assert.equal(frame.status, 0);
 
@@ -239,8 +249,12 @@ describe("Multiplexer", () => {
       let callCount = 0;
       const redirectMux = new Multiplexer(transport, {
         maxRedirects: 10,
-        onRedirect: async () => {
+        onRedirect: async (_host, _port, pending) => {
           callCount++;
+          // Simulate client retry
+          redirectMux.request(pending.requestId, pending.body, pending.data)
+            .then(pending.resolve)
+            .catch(pending.reject);
         },
       });
 
@@ -280,6 +294,43 @@ describe("Multiplexer", () => {
       await p2;
 
       assert.equal(callCount, 2);
+
+      redirectMux.close();
+    });
+
+    it("redirectCount can be initialized from options", async () => {
+      const redirectMux = new Multiplexer(transport, {
+        maxRedirects: 2,
+        redirectCount: 1,
+      });
+
+      assert.equal(redirectMux.getRedirectCount(), 1);
+
+      const body = new Uint8Array(16);
+      const host = "server";
+      const redirectBody = Buffer.alloc(4 + host.length + 1);
+      redirectBody.writeInt32BE(1094, 0);
+      redirectBody.write(host, 4, "utf8");
+
+      // First redirect (count goes from 1 to 2)
+      const p1 = redirectMux.request(3006, body);
+      await sleep(1);
+      transport.simulateResponse(4004, redirectBody);
+      await sleep(50);
+
+      assert.equal(redirectMux.getRedirectCount(), 2);
+
+      // Simulate success for retried request
+      const lastReq1 = transport.sentData[transport.sentData.length - 1];
+      const retrySid1 = extractStreamId(lastReq1);
+      transport.simulateResponseFor(retrySid1, 0, Buffer.alloc(0));
+      await p1;
+
+      // Next redirect should be rejected (count would exceed maxRedirects)
+      const p2 = redirectMux.request(3006, body);
+      await sleep(1);
+      transport.simulateResponse(4004, redirectBody);
+      await assert.rejects(p2, /Too many redirects/);
 
       redirectMux.close();
     });

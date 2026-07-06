@@ -1,6 +1,7 @@
 import { XRootDUrl } from "./url/url.ts";
 import { Transport } from "./transport/transport.ts";
 import { Multiplexer } from "./transport/multiplexer.ts";
+import type { DetachedRequest } from "./transport/multiplexer.ts";
 import { handshake } from "./session/handshake.ts";
 import { doAuthentication, registerAuthProtocol } from "./session/auth.ts";
 import { HostAuth } from "./security/host.ts";
@@ -13,8 +14,7 @@ import type { Session } from "./session/handshake.ts";
 import type { StatInfo } from "./api/types.ts";
 import type { DirectoryList } from "./api/types.ts";
 import { XRootDError } from "./api/errors.ts";
-import { ClientError, OpenFlags, RequestId } from "./protocol/constants.ts";
-import { buildEndsessRequest } from "./protocol/message.ts";
+import { ClientError, OpenFlags } from "./protocol/constants.ts";
 import type { SecEnv } from "./config/sec-env.ts";
 import { loadAuthConfig } from "./config/loader.ts";
 
@@ -36,6 +36,7 @@ export class XRootDClient {
   private mux: Multiplexer | null = null;
   private session: Session | null = null;
   private fs: FileSystem | null = null;
+  private redirectCount = 0;
 
   constructor(url: string, options: XRootDClientOptions = {}) {
     this.url = XRootDUrl.parse(url);
@@ -52,7 +53,8 @@ export class XRootDClient {
 
     this.mux = new Multiplexer(this.transport, {
       maxRedirects: this.options.maxRedirects ?? 16,
-      onRedirect: (host, port) => this.handleRedirect(host, port),
+      redirectCount: this.redirectCount,
+      onRedirect: (host, port, pending) => this.handleRedirect(host, port, pending),
     });
 
     if (this.options.timeout) {
@@ -100,19 +102,10 @@ export class XRootDClient {
     this.fs = new FileSystem(this.mux);
   }
 
-  private async handleRedirect(host: string, port: number): Promise<void> {
-    // End old session if exists
-    if (this.session && this.mux) {
-      try {
-        const endsessBody = buildEndsessRequest(0, this.session.sessid);
-        await this.mux.request(RequestId.Endsess, new Uint8Array(endsessBody));
-      } catch {
-        // Ignore endsess errors (old session may have expired)
-      }
-    }
-
-    // Close old connection
+  private async handleRedirect(host: string, port: number, pending: DetachedRequest): Promise<void> {
+    // Capture accumulated redirect count before destroying old mux
     if (this.mux) {
+      this.redirectCount = this.mux.getRedirectCount();
       this.mux.close();
       this.mux = null;
     }
@@ -121,9 +114,14 @@ export class XRootDClient {
       this.transport = null;
     }
 
-    // Connect to new host
+    // Connect to new host (new mux inherits accumulated redirectCount)
     const newUrl = XRootDUrl.parse(`root://${host}:${port}`);
     await this.doConnect(newUrl);
+
+    // Retry the original request on the new mux
+    this.mux!.request(pending.requestId, pending.body, pending.data)
+      .then(pending.resolve)
+      .catch(pending.reject);
   }
 
   async open(

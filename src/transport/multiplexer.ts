@@ -15,9 +15,18 @@ interface PendingRequest {
   data?: Uint8Array;
 }
 
+export interface DetachedRequest {
+  resolve: (frame: Frame) => void;
+  reject: (err: Error) => void;
+  requestId: number;
+  body: Uint8Array;
+  data?: Uint8Array;
+}
+
 export interface MultiplexerOptions {
   maxRedirects?: number;
-  onRedirect?: (host: string, port: number) => Promise<void>;
+  redirectCount?: number;
+  onRedirect?: (host: string, port: number, pending: DetachedRequest) => Promise<void>;
 }
 
 /**
@@ -37,12 +46,13 @@ export class Multiplexer {
   private closed = false;
   private redirectCount = 0;
   private maxRedirects: number;
-  private onRedirect?: (host: string, port: number) => Promise<void>;
+  private onRedirect?: (host: string, port: number, pending: DetachedRequest) => Promise<void>;
 
   constructor(transport: ITransport, options?: MultiplexerOptions) {
     this.transport = transport;
     this.framer = new Framer();
     this.maxRedirects = options?.maxRedirects ?? 16;
+    this.redirectCount = options?.redirectCount ?? 0;
     this.onRedirect = options?.onRedirect;
 
     this.sweepTimer = globalThis.setInterval(() => this.sweepTimeouts(), 1000);
@@ -151,8 +161,10 @@ export class Multiplexer {
     const pending = this.pending.get(sid);
     if (!pending) return;
 
+    // Detach: remove from pending WITHOUT rejecting
+    this.pending.delete(sid);
+
     if (this.redirectCount >= this.maxRedirects) {
-      this.pending.delete(sid);
       pending.reject(
         new Error(
           `Too many redirects (max ${this.maxRedirects})`,
@@ -165,16 +177,16 @@ export class Multiplexer {
     const { host, port } = parseRedirectResponse(frame.body);
 
     if (this.onRedirect) {
-      this.onRedirect(host, port)
-        .then(() => {
-          this.retryRequest(sid);
-        })
-        .catch((err) => {
-          this.pending.delete(sid);
-          pending.reject(err);
-        });
+      this.onRedirect(host, port, {
+        resolve: pending.resolve,
+        reject: pending.reject,
+        requestId: pending.requestId,
+        body: pending.body,
+        data: pending.data,
+      }).catch((err) => {
+        pending.reject(err);
+      });
     } else {
-      this.pending.delete(sid);
       pending.reject(
         new Error(
           `Redirect to ${host}:${port} but no onRedirect handler configured`,
@@ -208,6 +220,10 @@ export class Multiplexer {
 
   resetRedirectCount(): void {
     this.redirectCount = 0;
+  }
+
+  getRedirectCount(): number {
+    return this.redirectCount;
   }
 
   getTransport(): ITransport {
