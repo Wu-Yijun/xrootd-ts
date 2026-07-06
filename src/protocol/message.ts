@@ -46,4 +46,4 @@ export type {
   ProtocolResponse,
   RedirectResponse,
   WaitResponse,
-} from "./parsers.ts";
+} from "./types.ts";
