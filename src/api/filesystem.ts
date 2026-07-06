@@ -17,15 +17,15 @@ import { createStatInfo } from "./types.ts";
 import { extractBody, extractExtraData } from "../utils/request.ts";
 
 export class FileSystem {
-  private mux: Multiplexer;
+  private readonly getMux: () => Multiplexer;
 
-  constructor(mux: Multiplexer) {
-    this.mux = mux;
+  constructor(getMux: () => Multiplexer) {
+    this.getMux = getMux;
   }
 
   async stat(path: string): Promise<StatInfo> {
     const req = buildStatRequest(0, path);
-    const frame = await this.mux.request(
+    const frame = await this.getMux().request(
       RequestId.Stat,
       extractBody(req),
       extractExtraData(req),
@@ -36,7 +36,7 @@ export class FileSystem {
 
   async readdir(path: string): Promise<DirectoryList> {
     const req = buildDirlistRequest(0, path);
-    const frame = await this.mux.request(
+    const frame = await this.getMux().request(
       RequestId.Dirlist,
       extractBody(req),
       extractExtraData(req),
@@ -49,7 +49,7 @@ export class FileSystem {
 
   async mkdir(path: string, mode: number = 0o755): Promise<void> {
     const req = buildMkdirRequest(0, path, mode);
-    const frame = await this.mux.request(
+    const frame = await this.getMux().request(
       RequestId.Mkdir,
       extractBody(req),
       extractExtraData(req),
@@ -59,7 +59,7 @@ export class FileSystem {
 
   async rmdir(path: string): Promise<void> {
     const req = buildRmdirRequest(0, path);
-    const frame = await this.mux.request(
+    const frame = await this.getMux().request(
       RequestId.Rmdir,
       extractBody(req),
       extractExtraData(req),
@@ -69,7 +69,7 @@ export class FileSystem {
 
   async rm(path: string): Promise<void> {
     const req = buildRmRequest(0, path);
-    const frame = await this.mux.request(
+    const frame = await this.getMux().request(
       RequestId.Rm,
       extractBody(req),
       extractExtraData(req),
@@ -79,7 +79,7 @@ export class FileSystem {
 
   async mv(source: string, target: string): Promise<void> {
     const req = buildMvRequest(0, source, target);
-    const frame = await this.mux.request(
+    const frame = await this.getMux().request(
       RequestId.Mv,
       extractBody(req),
       extractExtraData(req),

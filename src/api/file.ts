@@ -1,5 +1,4 @@
 import { Multiplexer } from "../transport/multiplexer.ts";
-import type { Session } from "../session/handshake.ts";
 import {
   buildCloseRequest,
   buildOpenRequest,
@@ -21,14 +20,12 @@ import { createStatInfo, type StatInfo } from "./types.ts";
 import { sendRequest } from "../utils/request.ts";
 
 export class File {
-  private mux: Multiplexer;
-  private session: Session;
+  private readonly getMux: () => Multiplexer;
   private fhandle: Uint8Array | null = null;
   private _isOpen = false;
 
-  constructor(mux: Multiplexer, session: Session) {
-    this.mux = mux;
-    this.session = session;
+  constructor(getMux: () => Multiplexer) {
+    this.getMux = getMux;
   }
 
   get isOpen(): boolean {
@@ -47,7 +44,7 @@ export class File {
     const mode = options?.mode ?? 0;
 
     const buf = buildOpenRequest(0, path, flags, mode);
-    const frame = await sendRequest(this.mux, buf, Buffer.from(path));
+    const frame = await sendRequest(this.getMux(), buf, Buffer.from(path));
 
     if (frame.status === ResponseStatus.Error) {
       const { errnum, errmsg } = parseErrorResponse(frame.body);
@@ -73,7 +70,7 @@ export class File {
     }
 
     const buf = buildReadRequest(0, this.fhandle, offset, size);
-    const frame = await sendRequest(this.mux, buf);
+    const frame = await sendRequest(this.getMux(), buf);
 
     if (frame.status === ResponseStatus.Error) {
       const { errnum, errmsg } = parseErrorResponse(frame.body);
@@ -99,7 +96,7 @@ export class File {
     }
 
     const buf = buildWriteRequest(0, this.fhandle, offset, data);
-    const frame = await sendRequest(this.mux, buf, data);
+    const frame = await sendRequest(this.getMux(), buf, data);
 
     if (frame.status === ResponseStatus.Error) {
       const { errnum, errmsg } = parseErrorResponse(frame.body);
@@ -122,7 +119,7 @@ export class File {
     }
 
     const buf = buildCloseRequest(0, this.fhandle);
-    const frame = await sendRequest(this.mux, buf);
+    const frame = await sendRequest(this.getMux(), buf);
 
     this.fhandle = null;
     this._isOpen = false;
@@ -139,7 +136,7 @@ export class File {
     }
 
     const buf = buildStatRequest(0, "", this.fhandle);
-    const frame = await sendRequest(this.mux, buf);
+    const frame = await sendRequest(this.getMux(), buf);
 
     if (frame.status === ResponseStatus.Error) {
       const { errnum, errmsg } = parseErrorResponse(frame.body);
@@ -162,7 +159,7 @@ export class File {
     }
 
     const buf = buildSyncRequest(0, this.fhandle);
-    const frame = await sendRequest(this.mux, buf);
+    const frame = await sendRequest(this.getMux(), buf);
 
     if (frame.status === ResponseStatus.Error) {
       const { errnum, errmsg } = parseErrorResponse(frame.body);
@@ -176,7 +173,7 @@ export class File {
     }
 
     const buf = buildTruncateRequest(0, this.fhandle, size);
-    const frame = await sendRequest(this.mux, buf);
+    const frame = await sendRequest(this.getMux(), buf);
 
     if (frame.status === ResponseStatus.Error) {
       const { errnum, errmsg } = parseErrorResponse(frame.body);

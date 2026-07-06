@@ -100,7 +100,7 @@ export class XRootDClient {
       this.session.secEntity = secEntity;
     }
 
-    this.fs = new FileSystem(this.mux);
+    this.fs = new FileSystem(() => this.mux!);
   }
 
   private async handleRedirect(host: string, port: number, pending: DetachedRequest): Promise<void> {
@@ -164,7 +164,7 @@ export class XRootDClient {
   ): Promise<File> {
     this.ensureConnected();
 
-    const file = new File(this.mux!, this.session!);
+    const file = new File(() => this.mux!);
     await file.open(path, options);
     return file;
   }
@@ -172,7 +172,7 @@ export class XRootDClient {
   async stat(path: string): Promise<StatInfo> {
     this.ensureConnected();
 
-    const file = new File(this.mux!, this.session!);
+    const file = new File(() => this.mux!);
     await file.open(path, { flags: OpenFlags.Read });
     try {
       return await file.stat();
