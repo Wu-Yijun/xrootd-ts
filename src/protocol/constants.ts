@@ -1,6 +1,8 @@
 // ── Request Codes (3000–3032) ──────────────────────────────────────────────
+// NOTE: RequestId values overlap with ServerError values (both start at 3000).
+// This is by protocol design — they are distinguished by response context.
 export const RequestId = {
-  Auth: 3000,
+  Auth: 3000,       // same value as ServerError.ArgInvalid (different context)
   Query: 3001,
   Chmod: 3002,
   Close: 3003,
@@ -174,14 +176,14 @@ export const HANDSHAKE_FOURTH = 4;
 export const HANDSHAKE_FIFTH = 2012;
 
 // ── TLS flags (kXR_protocol flags field) ──────────────────────────────────
-export const kXR_secreqs = 0x01;
-export const kXR_ableTLS = 0x02;
-export const kXR_wantTLS = 0x04;
-export const kXR_bifreqs = 0x08;
+export const SecReqs = 0x01;
+export const AbleTLS = 0x02;
+export const WantTLS = 0x04;
+export const BifReqs = 0x08;
 
 // ── Expect values (kXR_protocol expect field) ─────────────────────────────
-export const kXR_ExpLogin = 0x01;
-export const kXR_ExpBind = 0x02;
+export const ExpLogin = 0x01;
+export const ExpBind = 0x02;
 
 // ── Default XRootD port ───────────────────────────────────────────────────
 export const DEFAULT_PORT = 1094;
@@ -200,7 +202,7 @@ export const MS_PER_SEC = 1000;
 /** Default POSIX directory mode (octal 755) */
 export const DEFAULT_DIR_MODE = 0o755;
 
-// ── File mode flags ──────────────────────────────────────────────────────
+// ── POSIX file mode flags (for stat/mkdir responses) ────────────────────
 export const S_IFDIR = 0o040000;
 export const S_IFLNK = 0o120000;
 
@@ -214,10 +216,11 @@ export const DirlistOptions = {
 export type DirlistOptions = typeof DirlistOptions[keyof typeof DirlistOptions];
 
 // ── Authentication credential types ─────────────────────────────────────
-export const CRED_TYPE: Record<string, number> = {
+export const CRED_TYPE = {
   host: 0,
   sss: 1,
   unix: 2,
   krb5: 3,
   gsi: 4,
-};
+} as const;
+export type CRED_TYPE = typeof CRED_TYPE[keyof typeof CRED_TYPE];

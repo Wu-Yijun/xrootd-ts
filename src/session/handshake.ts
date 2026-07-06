@@ -1,12 +1,12 @@
 import { Multiplexer } from "../transport/multiplexer.ts";
 import { XRootDUrl } from "../url/url.ts";
 import {
+  BifReqs,
   ClientError,
-  kXR_bifreqs,
-  kXR_ExpLogin,
-  kXR_secreqs,
+  ExpLogin,
   PROTOCOL_VERSION,
   ResponseStatus,
+  SecReqs,
 } from "../protocol/constants.ts";
 import {
   buildHandshakeAndProtocol,
@@ -58,9 +58,9 @@ export async function handshake(
 ): Promise<Session> {
   const username = options?.username ?? "";
   const pid = options?.pid ?? process.pid;
-  const flags = kXR_secreqs | kXR_bifreqs;
+  const flags = SecReqs | BifReqs;
 
-  const handshakeBuf = buildHandshakeAndProtocol(0, flags, kXR_ExpLogin);
+  const handshakeBuf = buildHandshakeAndProtocol(0, flags, ExpLogin);
 
   const transport = mux.getTransport();
 

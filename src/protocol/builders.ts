@@ -5,17 +5,17 @@
 
 import {
   DEFAULT_DIR_MODE,
+  ExpLogin,
   HANDSHAKE_FIFTH,
   HANDSHAKE_FIRST,
   HANDSHAKE_FOURTH,
   HANDSHAKE_SECOND,
   HANDSHAKE_THIRD,
-  kXR_ExpLogin,
-  kXR_secreqs,
   OFFSET_HIGH_SHIFT,
   PROTOCOL_VERSION,
   REQUEST_HDR_SIZE,
   RequestId,
+  SecReqs,
 } from "./constants.ts";
 import { Message } from "./message-class.ts";
 import { streamIdToBytes, strToBytes } from "../utils/bytes.ts";
@@ -30,8 +30,8 @@ import { streamIdToBytes, strToBytes } from "../utils/bytes.ts";
  */
 export function buildHandshakeAndProtocol(
   streamId: number,
-  flags: number = kXR_secreqs,
-  expect: number = kXR_ExpLogin,
+  flags: number = SecReqs,
+  expect: number = ExpLogin,
 ): Buffer {
   const msg = new Message(20 + REQUEST_HDR_SIZE);
 
