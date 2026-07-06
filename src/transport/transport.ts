@@ -2,6 +2,20 @@ import net from "node:net";
 import tls from "node:tls";
 import type { ITransport } from "./interface.ts";
 
+const DEBUG = process.env.DEBUG === "true";
+
+function DEBUG_to_ascii(buf: Buffer): string {
+  const p = buf.map(byte => {
+    // Check if byte is a printable ASCII character (32 = space, 126 = ~)
+    if (byte >= 32 && byte <= 126) {
+      return byte; // Keep the byte
+    }
+    // Replace unprintable bytes (like control characters or hex) with '.' (ASCII 46)
+    return 46;
+  });
+  return p.toString();
+}
+
 export class Transport implements ITransport {
   private socket: net.Socket | tls.TLSSocket | null = null;
   private closeCallback: (() => void) | null = null;
@@ -23,6 +37,8 @@ export class Transport implements ITransport {
     });
 
     this.socket.on("data", (chunk: Buffer) => {
+      if (DEBUG) console.log(`Transport.onData: received ${chunk.length} bytes: `, chunk);
+      if (DEBUG) console.log(`received ASCII: ${DEBUG_to_ascii(chunk)}`);
       for (const handler of this.dataHandlers) {
         handler(chunk);
       }
@@ -31,6 +47,7 @@ export class Transport implements ITransport {
   }
 
   send(data: Buffer): Promise<void> {
+    if (DEBUG) console.log(`Transport.send: sending ${data.length} bytes: `, data);
     return new Promise((resolve, reject) => {
       this.socket!.write(data, (err) => (err ? reject(err) : resolve()));
     });
