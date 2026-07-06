@@ -6,6 +6,7 @@ export interface ResolvedAuthConfig {
   username?: string;
   password?: string;
   sssKey?: Buffer;
+  krb5Principal?: string;
 }
 
 /**
@@ -16,7 +17,7 @@ export interface ResolvedAuthConfig {
  *   2. URL userinfo (root://user:pass@host)
  *   3. SecEnv XrdSecUSER / XrdSecCREDS
  *
- * Also reads the SSS keytab file specified by SecEnv if available.
+ * Also reads the SSS keytab file and Kerberos principal from SecEnv if available.
  */
 export function loadAuthConfig(options: {
   url?: XRootDUrl;
@@ -37,5 +38,10 @@ export function loadAuthConfig(options: {
     }
   }
 
-  return { username, password, sssKey };
+  // Kerberos principal: use username@host format if not explicitly configured
+  const krb5Principal = secEnv?.krb5InitToken
+    ? (username ? `${username}@${url?.host ?? "unknown"}` : undefined)
+    : undefined;
+
+  return { username, password, sssKey, krb5Principal };
 }

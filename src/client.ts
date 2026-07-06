@@ -6,6 +6,7 @@ import { doAuthentication, registerAuthProtocol } from "./session/auth.ts";
 import { HostAuth } from "./security/host.ts";
 import { SSSAuth } from "./security/sss.ts";
 import { UnixAuth } from "./security/unix.ts";
+import { Krb5Auth } from "./security/krb5.ts";
 import { File } from "./api/file.ts";
 import { FileSystem } from "./api/filesystem.ts";
 import type { Session } from "./session/handshake.ts";
@@ -74,6 +75,9 @@ export class XRootDClient {
     registerAuthProtocol("unix", () => new UnixAuth());
     if (authConfig.sssKey && SSSAuth.isSupported()) {
       registerAuthProtocol("sss", () => new SSSAuth(authConfig.sssKey!));
+    }
+    if (Krb5Auth.isSupported()) {
+      registerAuthProtocol("krb5", () => new Krb5Auth());
     }
 
     // Perform authentication if server requires it (login response had secToken)

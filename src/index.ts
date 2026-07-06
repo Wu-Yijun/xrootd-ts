@@ -38,6 +38,7 @@ export type { Session } from "./session/handshake.ts";
 
 // Security protocols
 export { UnixAuth } from "./security/unix.ts";
+export { Krb5Auth } from "./security/krb5.ts";
 
 // URL
 export { XRootDUrl } from "./url/url.ts";
