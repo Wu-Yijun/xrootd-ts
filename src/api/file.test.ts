@@ -5,7 +5,7 @@ import { Multiplexer } from "../transport/multiplexer.ts";
 import type { ITransport } from "../transport/interface.ts";
 import type { Session } from "../session/handshake.ts";
 import { XRootDError } from "./errors.ts";
-import { ResponseStatus } from "../protocol/constants.ts";
+import { XRootDUrl } from "../url/url.ts";
 
 function buildResponseFrame(
   streamId: number,
@@ -23,16 +23,21 @@ function extractStreamId(buf: Buffer): number {
   return (buf[0] << 8) | buf[1];
 }
 
-class MockTransportForFile implements ITransport {
+class MockTransport implements ITransport {
   private dataCallback: ((chunk: Buffer) => void) | null = null;
-  private closeCallback: (() => void) | null = null;
-  private errorCallback: ((err: Error) => void) | null = null;
   sentData: Buffer[] = [];
+  closed = false;
   private responseQueue: ((streamId: number) => Buffer)[] = [];
 
   async connect(): Promise<void> {}
-  async close(): Promise<void> {}
+  async close(): Promise<void> {
+    this.closed = true;
+  }
   destroy(): void {}
+  onData(_callback: (chunk: Buffer) => void): void {}
+  removeDataHandler(_callback: (chunk: Buffer) => void): void {}
+  onClose(_callback: () => void): void {}
+  onError(_callback: (err: Error) => void): void {}
 
   async send(data: Buffer): Promise<void> {
     this.sentData.push(Buffer.from(data));
@@ -44,29 +49,13 @@ class MockTransportForFile implements ITransport {
     }
   }
 
-  onData(callback: (chunk: Buffer) => void): void {
-    this.dataCallback = callback;
-  }
-
-  removeDataHandler(_callback: (chunk: Buffer) => void): void {}
-
-  onClose(callback: () => void): void {
-    this.closeCallback = callback;
-  }
-
-  onError(callback: (err: Error) => void): void {
-    this.errorCallback = callback;
-  }
-
   enqueueResponse(status: number, body: Buffer): void {
     this.responseQueue.push((sid) => buildResponseFrame(sid, status, body));
   }
 }
 
-const testSession: Session = {
-  sessid: new Uint8Array(16),
-  protocolVersion: 0x520,
-  needsAuth: false,
+const testOptions = {
+  url: XRootDUrl.parse("root://localhost:1094"),
 };
 
 function buildOpenBody(fhandle: Buffer): Buffer {
@@ -75,11 +64,21 @@ function buildOpenBody(fhandle: Buffer): Buffer {
   return body;
 }
 
+function createFileWithMock(mockTransport: MockTransport): {
+  file: File;
+  mux: Multiplexer;
+} {
+  const mux = new Multiplexer(mockTransport, { maxRedirects: 16 });
+  const file = new File(testOptions);
+  (file as any).transport = mockTransport;
+  (file as any).mux = mux;
+  return { file, mux };
+}
+
 describe("File", () => {
   it("open() sends correct request and stores fhandle", async () => {
-    const transport = new MockTransportForFile();
-    const mux = new Multiplexer(transport);
-    const file = new File(mux, testSession);
+    const transport = new MockTransport();
+    const { file, mux } = createFileWithMock(transport);
 
     const fhandle = Buffer.from([0xaa, 0xbb, 0xcc, 0xdd]);
     transport.enqueueResponse(0, buildOpenBody(fhandle));
@@ -94,9 +93,8 @@ describe("File", () => {
   });
 
   it("read() sends correct request with fhandle + offset + size", async () => {
-    const transport = new MockTransportForFile();
-    const mux = new Multiplexer(transport);
-    const file = new File(mux, testSession);
+    const transport = new MockTransport();
+    const { file, mux } = createFileWithMock(transport);
 
     const fhandle = Buffer.from([0x01, 0x02, 0x03, 0x04]);
     transport.enqueueResponse(0, buildOpenBody(fhandle));
@@ -117,9 +115,8 @@ describe("File", () => {
   });
 
   it("write() sends correct request", async () => {
-    const transport = new MockTransportForFile();
-    const mux = new Multiplexer(transport);
-    const file = new File(mux, testSession);
+    const transport = new MockTransport();
+    const { file, mux } = createFileWithMock(transport);
 
     const fhandle = Buffer.from([0x11, 0x22, 0x33, 0x44]);
     transport.enqueueResponse(0, buildOpenBody(fhandle));
@@ -140,9 +137,8 @@ describe("File", () => {
   });
 
   it("close() sends close request and clears state", async () => {
-    const transport = new MockTransportForFile();
-    const mux = new Multiplexer(transport);
-    const file = new File(mux, testSession);
+    const transport = new MockTransport();
+    const { file, mux } = createFileWithMock(transport);
 
     const fhandle = Buffer.from([0xaa, 0xbb, 0xcc, 0xdd]);
     transport.enqueueResponse(0, buildOpenBody(fhandle));
@@ -157,9 +153,8 @@ describe("File", () => {
   });
 
   it("operations on closed file throw XRootDError", async () => {
-    const transport = new MockTransportForFile();
-    const mux = new Multiplexer(transport);
-    const file = new File(mux, testSession);
+    const transport = new MockTransport();
+    const { file, mux } = createFileWithMock(transport);
 
     await assert.rejects(
       () => file.read(0, 100),
@@ -175,9 +170,8 @@ describe("File", () => {
   });
 
   it("open on already-open file throws", async () => {
-    const transport = new MockTransportForFile();
-    const mux = new Multiplexer(transport);
-    const file = new File(mux, testSession);
+    const transport = new MockTransport();
+    const { file, mux } = createFileWithMock(transport);
 
     const fhandle = Buffer.from([0x01, 0x02, 0x03, 0x04]);
     transport.enqueueResponse(0, buildOpenBody(fhandle));
@@ -194,9 +188,8 @@ describe("File", () => {
   });
 
   it("open error throws XRootDError", async () => {
-    const transport = new MockTransportForFile();
-    const mux = new Multiplexer(transport);
-    const file = new File(mux, testSession);
+    const transport = new MockTransport();
+    const { file, mux } = createFileWithMock(transport);
 
     const errMsg = "not found";
     const errBody = Buffer.alloc(4 + errMsg.length + 1);
@@ -214,9 +207,8 @@ describe("File", () => {
   });
 
   it("sync() sends sync request", async () => {
-    const transport = new MockTransportForFile();
-    const mux = new Multiplexer(transport);
-    const file = new File(mux, testSession);
+    const transport = new MockTransport();
+    const { file, mux } = createFileWithMock(transport);
 
     const fhandle = Buffer.from([0xaa, 0xbb, 0xcc, 0xdd]);
     transport.enqueueResponse(0, buildOpenBody(fhandle));
@@ -234,9 +226,8 @@ describe("File", () => {
   });
 
   it("sync() on closed file throws", async () => {
-    const transport = new MockTransportForFile();
-    const mux = new Multiplexer(transport);
-    const file = new File(mux, testSession);
+    const transport = new MockTransport();
+    const { file, mux } = createFileWithMock(transport);
 
     await assert.rejects(
       () => file.sync(),
@@ -247,9 +238,8 @@ describe("File", () => {
   });
 
   it("truncate() sends truncate request", async () => {
-    const transport = new MockTransportForFile();
-    const mux = new Multiplexer(transport);
-    const file = new File(mux, testSession);
+    const transport = new MockTransport();
+    const { file, mux } = createFileWithMock(transport);
 
     const fhandle = Buffer.from([0xaa, 0xbb, 0xcc, 0xdd]);
     transport.enqueueResponse(0, buildOpenBody(fhandle));
@@ -267,9 +257,8 @@ describe("File", () => {
   });
 
   it("truncate() on closed file throws", async () => {
-    const transport = new MockTransportForFile();
-    const mux = new Multiplexer(transport);
-    const file = new File(mux, testSession);
+    const transport = new MockTransport();
+    const { file, mux } = createFileWithMock(transport);
 
     await assert.rejects(
       () => file.truncate(0),

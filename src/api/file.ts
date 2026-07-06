@@ -60,17 +60,19 @@ export class File {
     const mode = options?.mode ?? 0;
 
     try {
-      const conn = await connectToHost(this.options.url, {
-        credentials: this.options.credentials,
-        tls: this.options.tls,
-        secEnv: this.options.secEnv,
-        timeout: this.options.timeout,
-        maxRedirects: this.options.maxRedirects,
-        onRedirect: (host, port, pending) =>
-          this.handleRedirect(host, port, pending),
-      });
-      this.transport = conn.transport;
-      this.mux = conn.mux;
+      if (!this.mux) {
+        const conn = await connectToHost(this.options.url, {
+          credentials: this.options.credentials,
+          tls: this.options.tls,
+          secEnv: this.options.secEnv,
+          timeout: this.options.timeout,
+          maxRedirects: this.options.maxRedirects,
+          onRedirect: (host, port, pending) =>
+            this.handleRedirect(host, port, pending),
+        });
+        this.transport = conn.transport;
+        this.mux = conn.mux;
+      }
 
       const buf = buildOpenRequest(0, path, flags, mode);
       const frame = await sendRequest(this.mux, buf, Buffer.from(path));
