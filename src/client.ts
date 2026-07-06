@@ -119,30 +119,40 @@ export class XRootDClient {
     this.session = null;
     this.fs = null;
 
-    // Fix: Correctly construct the URL by inserting the port before the query string
+    // Parse opaque query string (capability tokens) from the redirect host.
+    // Server returns e.g. "eos07.ihep.ac.cn?&cap.sym=...&cap.msg=..."
     let urlStr: string;
+    let opaqueQuery = "";
     const qIndex = host.indexOf('?');
     if (qIndex !== -1) {
       const hostname = host.substring(0, qIndex);
-      const query = host.substring(qIndex);
-      urlStr = `root://${hostname}:${port}${query}`;
+      opaqueQuery = host.substring(qIndex);
+      urlStr = `root://${hostname}:${port}${opaqueQuery}`;
     } else {
       urlStr = `root://${host}:${port}`;
     }
 
-    // Connect to new host (new mux inherits accumulated redirectCount)
     const newUrl = XRootDUrl.parse(urlStr);
-    await this.doConnect(newUrl);
 
     try {
       await this.doConnect(newUrl);
-      
-      // Retry the original request on the new mux
-      this.mux!.request(pending.requestId, pending.body, pending.data)
+
+      // Append opaque data (capability tokens) to the request payload (file path).
+      // This mirrors C++ RewriteCGIAndPath() which merges redirect URL params
+      // into the request path so data nodes can verify authorization.
+      let requestData = pending.data;
+      if (opaqueQuery && requestData && requestData.length > 0) {
+        const opaqueBytes = Buffer.from(opaqueQuery, "utf-8");
+        const merged = new Uint8Array(requestData.length + opaqueBytes.length);
+        merged.set(requestData);
+        merged.set(opaqueBytes, requestData.length);
+        requestData = merged;
+      }
+
+      this.mux!.request(pending.requestId, pending.body, requestData)
         .then(pending.resolve)
         .catch(pending.reject);
     } catch (err) {
-      // If the redirect connection fails, clean up the broken state and reject
       await this.close();
       pending.reject(err as Error);
     }
