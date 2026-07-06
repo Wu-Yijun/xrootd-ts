@@ -1,4 +1,7 @@
+import { Transport } from "../transport/transport.ts";
 import { Multiplexer } from "../transport/multiplexer.ts";
+import type { DetachedRequest } from "../transport/multiplexer.ts";
+import { connectToHost } from "../session/connect.ts";
 import {
   buildCloseRequest,
   buildOpenRequest,
@@ -9,6 +12,7 @@ import {
   buildWriteRequest,
   parseOpenResponse,
 } from "../protocol/message.ts";
+import { parseRedirectResponse } from "../protocol/message.ts";
 import {
   OpenFlags,
   ResponseStatus,
@@ -17,14 +21,27 @@ import {
 import { assertOkFrame, XRootDError } from "./errors.ts";
 import { createStatInfo, type StatInfo } from "./types.ts";
 import { sendRequest } from "../utils/request.ts";
+import { XRootDUrl } from "../url/url.ts";
+import type { SecEnv } from "../config/sec-env.ts";
+
+export interface FileConnectionOptions {
+  url: XRootDUrl;
+  credentials?: { username: string; password?: string };
+  tls?: { rejectUnauthorized?: boolean };
+  secEnv?: SecEnv;
+  timeout?: number;
+  maxRedirects?: number;
+}
 
 export class File {
-  private readonly getMux: () => Multiplexer;
+  private readonly options: FileConnectionOptions;
+  private transport: Transport | null = null;
+  private mux: Multiplexer | null = null;
   private fhandle: Uint8Array | null = null;
   private _isOpen = false;
 
-  constructor(getMux: () => Multiplexer) {
-    this.getMux = getMux;
+  constructor(options: FileConnectionOptions) {
+    this.options = options;
   }
 
   get isOpen(): boolean {
@@ -42,22 +59,109 @@ export class File {
     const flags = options?.flags ?? OpenFlags.Read;
     const mode = options?.mode ?? 0;
 
-    const buf = buildOpenRequest(0, path, flags, mode);
-    const frame = await sendRequest(this.getMux(), buf, Buffer.from(path));
+    try {
+      const conn = await connectToHost(this.options.url, {
+        credentials: this.options.credentials,
+        tls: this.options.tls,
+        secEnv: this.options.secEnv,
+        timeout: this.options.timeout,
+        maxRedirects: this.options.maxRedirects,
+        onRedirect: (host, port, pending) =>
+          this.handleRedirect(host, port, pending),
+      });
+      this.transport = conn.transport;
+      this.mux = conn.mux;
 
-    assertOkFrame(frame);
+      const buf = buildOpenRequest(0, path, flags, mode);
+      const frame = await sendRequest(this.mux, buf, Buffer.from(path));
 
-    if (frame.status === ResponseStatus.Ok) {
-      const resp = parseOpenResponse(frame.body);
-      this.fhandle = resp.fhandle;
-      this._isOpen = true;
-      return;
+      assertOkFrame(frame);
+
+      if (frame.status === ResponseStatus.Ok) {
+        const resp = parseOpenResponse(frame.body);
+        this.fhandle = resp.fhandle;
+        this._isOpen = true;
+        return;
+      }
+
+      throw new XRootDError(
+        ServerError.ServerError,
+        `Unexpected open response status: ${frame.status}`,
+      );
+    } catch (err) {
+      await this.cleanup();
+      throw err;
+    }
+  }
+
+  private async handleRedirect(
+    host: string,
+    port: number,
+    pending: DetachedRequest,
+  ): Promise<void> {
+    if (this.mux) {
+      this.mux.close();
+      this.mux = null;
+    }
+    if (this.transport) {
+      await this.transport.close();
+      this.transport = null;
     }
 
-    throw new XRootDError(
-      ServerError.ServerError,
-      `Unexpected open response status: ${frame.status}`,
-    );
+    let urlStr: string;
+    let opaqueQuery = "";
+    const qIndex = host.indexOf("?");
+    if (qIndex !== -1) {
+      const hostname = host.substring(0, qIndex);
+      opaqueQuery = host.substring(qIndex);
+      urlStr = `root://${hostname}:${port}${opaqueQuery}`;
+    } else {
+      urlStr = `root://${host}:${port}`;
+    }
+
+    const newUrl = XRootDUrl.parse(urlStr);
+
+    try {
+      const conn = await connectToHost(newUrl, {
+        credentials: this.options.credentials,
+        tls: this.options.tls,
+        secEnv: this.options.secEnv,
+        timeout: this.options.timeout,
+        maxRedirects: this.options.maxRedirects,
+        onRedirect: (h, p, p2) => this.handleRedirect(h, p, p2),
+      });
+      this.transport = conn.transport;
+      this.mux = conn.mux;
+
+      let requestData = pending.data;
+      if (opaqueQuery && requestData && requestData.length > 0) {
+        const opaqueBytes = Buffer.from(opaqueQuery, "utf-8");
+        const merged = new Uint8Array(requestData.length + opaqueBytes.length);
+        merged.set(requestData);
+        merged.set(opaqueBytes, requestData.length);
+        requestData = merged;
+      }
+
+      this.mux.request(pending.requestId, pending.body, requestData)
+        .then(pending.resolve)
+        .catch(pending.reject);
+    } catch (err) {
+      await this.cleanup();
+      pending.reject(err as Error);
+    }
+  }
+
+  private async cleanup(): Promise<void> {
+    if (this.mux) {
+      this.mux.close();
+      this.mux = null;
+    }
+    if (this.transport) {
+      await this.transport.close();
+      this.transport = null;
+    }
+    this.fhandle = null;
+    this._isOpen = false;
   }
 
   async read(offset: number, size: number): Promise<Uint8Array> {
@@ -66,7 +170,7 @@ export class File {
     }
 
     const buf = buildReadRequest(0, this.fhandle, offset, size);
-    const frame = await sendRequest(this.getMux(), buf);
+    const frame = await sendRequest(this.mux!, buf);
 
     assertOkFrame(frame);
 
@@ -89,7 +193,7 @@ export class File {
     }
 
     const buf = buildWriteRequest(0, this.fhandle, offset, data);
-    const frame = await sendRequest(this.getMux(), buf, data);
+    const frame = await sendRequest(this.mux!, buf, data);
 
     assertOkFrame(frame);
 
@@ -109,12 +213,14 @@ export class File {
     }
 
     const buf = buildCloseRequest(0, this.fhandle);
-    const frame = await sendRequest(this.getMux(), buf);
+    const frame = await sendRequest(this.mux!, buf);
 
     this.fhandle = null;
     this._isOpen = false;
 
     assertOkFrame(frame);
+
+    await this.cleanup();
   }
 
   async stat(): Promise<StatInfo> {
@@ -123,7 +229,7 @@ export class File {
     }
 
     const buf = buildStatRequest(0, "", this.fhandle);
-    const frame = await sendRequest(this.getMux(), buf);
+    const frame = await sendRequest(this.mux!, buf);
 
     assertOkFrame(frame);
 
@@ -143,7 +249,7 @@ export class File {
     }
 
     const buf = buildSyncRequest(0, this.fhandle);
-    const frame = await sendRequest(this.getMux(), buf);
+    const frame = await sendRequest(this.mux!, buf);
 
     assertOkFrame(frame);
   }
@@ -154,7 +260,7 @@ export class File {
     }
 
     const buf = buildTruncateRequest(0, this.fhandle, size);
-    const frame = await sendRequest(this.getMux(), buf);
+    const frame = await sendRequest(this.mux!, buf);
 
     assertOkFrame(frame);
   }
