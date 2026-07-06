@@ -1,14 +1,7 @@
 import { createCipheriv } from "node:crypto";
 import type { AuthParams, SecEntity, SecurityProtocol } from "./interface.ts";
 import { crc32 } from "../utils/crc32.ts";
-
-function pkcs5Pad(data: Buffer, blockSize: number): Buffer {
-  const padLen = blockSize - (data.length % blockSize);
-  const padded = Buffer.alloc(data.length + padLen);
-  data.copy(padded);
-  padded.fill(padLen, data.length);
-  return padded;
-}
+import { pkcs5Pad } from "../utils/crypto.ts";
 
 /**
  * SSS (Simple Shared Secret) authentication protocol.

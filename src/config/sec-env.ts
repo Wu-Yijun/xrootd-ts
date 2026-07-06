@@ -1,4 +1,5 @@
 import { homedir } from "node:os";
+import { truthy } from "../utils/bool.ts";
 
 export interface SecEnvOptions {
   /** Environment variable source. Defaults to process.env. */
@@ -100,8 +101,4 @@ export class SecEnv {
     if (!raw) return [];
     return raw.split(",").map((s) => s.trim()).filter(Boolean);
   }
-}
-
-function truthy(val: string | undefined): boolean {
-  return val !== undefined && val !== "0" && val !== "";
 }
