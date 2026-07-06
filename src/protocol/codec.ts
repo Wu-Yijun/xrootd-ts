@@ -4,6 +4,10 @@
  * Every multi-byte field in XRootD is transmitted in network byte order
  * (big-endian).  The helpers below keep offset tracking explicit so
  * callers never forget to advance.
+ *
+ * NOTE: These functions use Node.js Buffer for I/O operations since the
+ * protocol layer requires big-endian read/write methods. This is acceptable
+ * as the library is designed for Node.js environments.
  */
 
 // ── uint16 ─────────────────────────────────────────────────────────────────
@@ -82,6 +86,6 @@ export function getBytes(
   buf: Buffer,
   offset: number,
   length: number,
-): [Buffer, number] {
+): [Uint8Array, number] {
   return [buf.subarray(offset, offset + length), offset + length];
 }
