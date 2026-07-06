@@ -36,6 +36,9 @@ export type { Frame } from "./transport/framer.ts";
 export { handshake } from "./session/handshake.ts";
 export type { Session } from "./session/handshake.ts";
 
+// Security protocols
+export { UnixAuth } from "./security/unix.ts";
+
 // URL
 export { XRootDUrl } from "./url/url.ts";
 

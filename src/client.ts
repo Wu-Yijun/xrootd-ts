@@ -5,6 +5,7 @@ import { handshake } from "./session/handshake.ts";
 import { doAuthentication, registerAuthProtocol } from "./session/auth.ts";
 import { HostAuth } from "./security/host.ts";
 import { SSSAuth } from "./security/sss.ts";
+import { UnixAuth } from "./security/unix.ts";
 import { File } from "./api/file.ts";
 import { FileSystem } from "./api/filesystem.ts";
 import type { Session } from "./session/handshake.ts";
@@ -70,6 +71,7 @@ export class XRootDClient {
 
     // Register supported authentication protocols
     registerAuthProtocol("host", () => new HostAuth());
+    registerAuthProtocol("unix", () => new UnixAuth());
     if (authConfig.sssKey && SSSAuth.isSupported()) {
       registerAuthProtocol("sss", () => new SSSAuth(authConfig.sssKey!));
     }
