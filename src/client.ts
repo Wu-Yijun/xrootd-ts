@@ -114,14 +114,37 @@ export class XRootDClient {
       this.transport = null;
     }
 
+    // CRITICAL: Nullify old state so we don't use stale objects if reconnection fails
+    this.session = null;
+    this.fs = null;
+
+    // Fix: Correctly construct the URL by inserting the port before the query string
+    let urlStr: string;
+    const qIndex = host.indexOf('?');
+    if (qIndex !== -1) {
+      const hostname = host.substring(0, qIndex);
+      const query = host.substring(qIndex);
+      urlStr = `root://${hostname}:${port}${query}`;
+    } else {
+      urlStr = `root://${host}:${port}`;
+    }
+
     // Connect to new host (new mux inherits accumulated redirectCount)
-    const newUrl = XRootDUrl.parse(`root://${host}:${port}`);
+    const newUrl = XRootDUrl.parse(urlStr);
     await this.doConnect(newUrl);
 
-    // Retry the original request on the new mux
-    this.mux!.request(pending.requestId, pending.body, pending.data)
-      .then(pending.resolve)
-      .catch(pending.reject);
+    try {
+      await this.doConnect(newUrl);
+      
+      // Retry the original request on the new mux
+      this.mux!.request(pending.requestId, pending.body, pending.data)
+        .then(pending.resolve)
+        .catch(pending.reject);
+    } catch (err) {
+      // If the redirect connection fails, clean up the broken state and reject
+      await this.close();
+      pending.reject(err as Error);
+    }
   }
 
   async open(
