@@ -48,12 +48,15 @@ export class Krb5Auth implements SecurityProtocol {
     const kerberosClient = await kerberos.initializeClient(servicePrincipal);
 
     // Generate the authentication token (step 1 of the GSSAPI flow)
-    const token = await kerberosClient.step();
+    // First step: pass empty string as challenge
+    const token = await kerberosClient.step("");
+
+    // The token is base64 encoded, decode it to bytes
+    const tokenBytes = Buffer.from(token, "base64");
 
     // Encode as "krb5" + token
     const encoder = new TextEncoder();
     const prefix = encoder.encode("krb5");
-    const tokenBytes = new Uint8Array(token);
 
     const result = new Uint8Array(prefix.length + tokenBytes.length);
     result.set(prefix);
