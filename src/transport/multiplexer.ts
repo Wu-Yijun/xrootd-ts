@@ -307,6 +307,12 @@ export class Multiplexer {
     return this.redirectCount;
   }
 
+  updateRedirectHandler(
+    handler: (host: string, port: number, pending: DetachedRequest) => Promise<void>,
+  ): void {
+    this.onRedirect = handler;
+  }
+
   getTransport(): ITransport {
     return this.transport;
   }
