@@ -2,25 +2,15 @@ import { XRootDUrl } from "./url/url.ts";
 import { Transport } from "./transport/transport.ts";
 import { Multiplexer } from "./transport/multiplexer.ts";
 import type { DetachedRequest } from "./transport/multiplexer.ts";
-import { handshake } from "./session/handshake.ts";
-import { doAuthentication, registerAuthProtocol } from "./session/auth.ts";
-import { HostAuth } from "./security/host.ts";
-import { SSSAuth } from "./security/sss.ts";
-import { UnixAuth } from "./security/unix.ts";
-import { Krb5Auth } from "./security/krb5.ts";
+import { connectToHost } from "./session/connect.ts";
 import { File } from "./api/file.ts";
 import { FileSystem } from "./api/filesystem.ts";
 import type { Session } from "./session/handshake.ts";
 import type { StatInfo } from "./api/types.ts";
 import type { DirectoryList } from "./api/types.ts";
 import { XRootDError } from "./api/errors.ts";
-import {
-  ClientError,
-  DEFAULT_MAX_REDIRECTS,
-  OpenFlags,
-} from "./protocol/constants.ts";
+import { ClientError, OpenFlags } from "./protocol/constants.ts";
 import type { SecEnv } from "./config/sec-env.ts";
-import { loadAuthConfig } from "./config/loader.ts";
 
 export interface XRootDClientOptions {
   credentials?: {
@@ -57,63 +47,20 @@ export class XRootDClient {
   }
 
   private async doConnect(url: XRootDUrl): Promise<void> {
-    this.transport = new Transport();
-    await this.transport.connect(
-      url.host,
-      url.port,
-      url.isSecure(),
-      this.options.tls,
-    );
-
-    this.mux = new Multiplexer(this.transport, {
-      maxRedirects: this.options.maxRedirects ?? DEFAULT_MAX_REDIRECTS,
+    const conn = await connectToHost(url, {
+      credentials: this.options.credentials,
+      timeout: this.options.timeout,
+      maxRedirects: this.options.maxRedirects,
       redirectCount: this.redirectCount,
+      tls: this.options.tls,
+      secEnv: this.options.secEnv,
       onRedirect: (host, port, pending) =>
         this.handleRedirect(host, port, pending),
     });
 
-    if (this.options.timeout) {
-      this.mux.setTimeout(this.options.timeout);
-    }
-
-    this.session = await handshake(this.mux, url, {
-      username: this.options.credentials?.username,
-    });
-
-    const secEnv = this.options.secEnv;
-    const authConfig = loadAuthConfig({
-      url,
-      credentials: this.options.credentials,
-      secEnv,
-    });
-
-    // Register supported authentication protocols
-    registerAuthProtocol("host", () => new HostAuth());
-    registerAuthProtocol("unix", () => new UnixAuth());
-    if (authConfig.sssKey && SSSAuth.isSupported()) {
-      registerAuthProtocol("sss", () => new SSSAuth(authConfig.sssKey!));
-    }
-    if (Krb5Auth.isSupported()) {
-      registerAuthProtocol("krb5", () => new Krb5Auth());
-    }
-
-    // Perform authentication if server requires it (login response had secToken)
-    if (this.session.needsAuth && this.session.authProtocols?.length) {
-      const secEntity = await doAuthentication(
-        this.mux,
-        this.session.authProtocols,
-        {
-          host: url.host,
-          port: url.port,
-          username: authConfig.username,
-          password: authConfig.password,
-          sessid: this.session.sessid,
-          spnPrefix: this.session.spnPrefix,
-        },
-        { protocolFilter: secEnv?.protocolFilter },
-      );
-      this.session.secEntity = secEntity;
-    }
+    this.transport = conn.transport;
+    this.mux = conn.mux;
+    this.session = conn.session;
 
     this.fs = new FileSystem(() => {
       if (!this.mux) {
@@ -131,7 +78,6 @@ export class XRootDClient {
     port: number,
     pending: DetachedRequest,
   ): Promise<void> {
-    // Capture accumulated redirect count before destroying old mux
     if (this.mux) {
       this.redirectCount = this.mux.getRedirectCount();
       this.mux.close();
@@ -142,12 +88,9 @@ export class XRootDClient {
       this.transport = null;
     }
 
-    // CRITICAL: Nullify old state so we don't use stale objects if reconnection fails
     this.session = null;
     this.fs = null;
 
-    // Parse opaque query string (capability tokens) from the redirect host.
-    // Server returns e.g. "eos07.ihep.ac.cn?&cap.sym=...&cap.msg=..."
     let urlStr: string;
     let opaqueQuery = "";
     const qIndex = host.indexOf("?");
@@ -164,9 +107,6 @@ export class XRootDClient {
     try {
       await this.doConnect(newUrl);
 
-      // Append opaque data (capability tokens) to the request payload (file path).
-      // This mirrors C++ RewriteCGIAndPath() which merges redirect URL params
-      // into the request path so data nodes can verify authorization.
       let requestData = pending.data;
       if (opaqueQuery && requestData && requestData.length > 0) {
         const opaqueBytes = Buffer.from(opaqueQuery, "utf-8");
@@ -197,7 +137,14 @@ export class XRootDClient {
   ): Promise<File> {
     this.ensureConnected();
 
-    const file = new File(() => this.mux!);
+    const file = new File({
+      url: this.url,
+      credentials: this.options.credentials,
+      tls: this.options.tls,
+      secEnv: this.options.secEnv,
+      timeout: this.options.timeout,
+      maxRedirects: this.options.maxRedirects,
+    });
     await file.open(path, options);
     return file;
   }
@@ -205,7 +152,14 @@ export class XRootDClient {
   async stat(path: string): Promise<StatInfo> {
     this.ensureConnected();
 
-    const file = new File(() => this.mux!);
+    const file = new File({
+      url: this.url,
+      credentials: this.options.credentials,
+      tls: this.options.tls,
+      secEnv: this.options.secEnv,
+      timeout: this.options.timeout,
+      maxRedirects: this.options.maxRedirects,
+    });
     await file.open(path, { flags: OpenFlags.Read });
     try {
       return await file.stat();
