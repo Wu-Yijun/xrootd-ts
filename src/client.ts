@@ -135,7 +135,7 @@ export class XRootDClient {
     if (this.mux) {
       this.redirectCount = this.mux.getRedirectCount();
       this.mux.close();
-      this.mux = null;
+      this.mux = null as Multiplexer | null;
     }
     if (this.transport) {
       await this.transport.close();
@@ -195,17 +195,17 @@ export class XRootDClient {
     path: string,
     options?: { flags?: number; mode?: number },
   ): Promise<File> {
-    const mux = this.ensureConnected();
+    this.ensureConnected();
 
-    const file = new File(() => mux);
+    const file = new File(() => this.mux!);
     await file.open(path, options);
     return file;
   }
 
   async stat(path: string): Promise<StatInfo> {
-    const mux = this.ensureConnected();
+    this.ensureConnected();
 
-    const file = new File(() => mux);
+    const file = new File(() => this.mux!);
     await file.open(path, { flags: OpenFlags.Read });
     try {
       return await file.stat();
