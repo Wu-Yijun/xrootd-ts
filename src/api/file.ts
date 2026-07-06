@@ -7,7 +7,6 @@ import {
   buildSyncRequest,
   buildTruncateRequest,
   buildWriteRequest,
-  parseErrorResponse,
   parseOpenResponse,
 } from "../protocol/message.ts";
 import {
@@ -15,7 +14,7 @@ import {
   ResponseStatus,
   ServerError,
 } from "../protocol/constants.ts";
-import { XRootDError } from "./errors.ts";
+import { XRootDError, assertOkFrame } from "./errors.ts";
 import { createStatInfo, type StatInfo } from "./types.ts";
 import { sendRequest } from "../utils/request.ts";
 
@@ -46,10 +45,7 @@ export class File {
     const buf = buildOpenRequest(0, path, flags, mode);
     const frame = await sendRequest(this.getMux(), buf, Buffer.from(path));
 
-    if (frame.status === ResponseStatus.Error) {
-      const { errnum, errmsg } = parseErrorResponse(frame.body);
-      throw new XRootDError(errnum, errmsg);
-    }
+    assertOkFrame(frame);
 
     if (frame.status === ResponseStatus.Ok) {
       const resp = parseOpenResponse(frame.body);
@@ -72,10 +68,7 @@ export class File {
     const buf = buildReadRequest(0, this.fhandle, offset, size);
     const frame = await sendRequest(this.getMux(), buf);
 
-    if (frame.status === ResponseStatus.Error) {
-      const { errnum, errmsg } = parseErrorResponse(frame.body);
-      throw new XRootDError(errnum, errmsg);
-    }
+    assertOkFrame(frame);
 
     if (
       frame.status === ResponseStatus.Ok ||
@@ -98,10 +91,7 @@ export class File {
     const buf = buildWriteRequest(0, this.fhandle, offset, data);
     const frame = await sendRequest(this.getMux(), buf, data);
 
-    if (frame.status === ResponseStatus.Error) {
-      const { errnum, errmsg } = parseErrorResponse(frame.body);
-      throw new XRootDError(errnum, errmsg);
-    }
+    assertOkFrame(frame);
 
     if (frame.status === ResponseStatus.Ok) {
       return frame.dlen > 0 ? frame.dlen : data.length;
@@ -124,10 +114,7 @@ export class File {
     this.fhandle = null;
     this._isOpen = false;
 
-    if (frame.status === ResponseStatus.Error) {
-      const { errnum, errmsg } = parseErrorResponse(frame.body);
-      throw new XRootDError(errnum, errmsg);
-    }
+    assertOkFrame(frame);
   }
 
   async stat(): Promise<StatInfo> {
@@ -138,10 +125,7 @@ export class File {
     const buf = buildStatRequest(0, "", this.fhandle);
     const frame = await sendRequest(this.getMux(), buf);
 
-    if (frame.status === ResponseStatus.Error) {
-      const { errnum, errmsg } = parseErrorResponse(frame.body);
-      throw new XRootDError(errnum, errmsg);
-    }
+    assertOkFrame(frame);
 
     if (frame.status === ResponseStatus.Ok) {
       return parseStatInfo(frame.body);
@@ -161,10 +145,7 @@ export class File {
     const buf = buildSyncRequest(0, this.fhandle);
     const frame = await sendRequest(this.getMux(), buf);
 
-    if (frame.status === ResponseStatus.Error) {
-      const { errnum, errmsg } = parseErrorResponse(frame.body);
-      throw new XRootDError(errnum, errmsg);
-    }
+    assertOkFrame(frame);
   }
 
   async truncate(size: number): Promise<void> {
@@ -175,10 +156,7 @@ export class File {
     const buf = buildTruncateRequest(0, this.fhandle, size);
     const frame = await sendRequest(this.getMux(), buf);
 
-    if (frame.status === ResponseStatus.Error) {
-      const { errnum, errmsg } = parseErrorResponse(frame.body);
-      throw new XRootDError(errnum, errmsg);
-    }
+    assertOkFrame(frame);
   }
 }
 

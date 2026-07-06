@@ -1,5 +1,4 @@
 import type { Multiplexer } from "../transport/multiplexer.ts";
-import type { Frame } from "../transport/framer.ts";
 import {
   buildDirlistRequest,
   buildMkdirRequest,
@@ -8,10 +7,9 @@ import {
   buildRmRequest,
   buildStatRequest,
   parseDirlistResponse,
-  parseErrorResponse,
 } from "../protocol/message.ts";
-import { RequestId, ResponseStatus, DirlistOptions, DEFAULT_DIR_MODE } from "../protocol/constants.ts";
-import { XRootDError } from "./errors.ts";
+import { RequestId, DirlistOptions, DEFAULT_DIR_MODE } from "../protocol/constants.ts";
+import { assertOkFrame } from "./errors.ts";
 import type { DirectoryList, StatInfo } from "./types.ts";
 import { createStatInfo } from "./types.ts";
 import { extractBody, extractExtraData } from "../utils/request.ts";
@@ -30,7 +28,7 @@ export class FileSystem {
       extractBody(req),
       extractExtraData(req),
     );
-    this.handleError(frame);
+    assertOkFrame(frame);
     return createStatInfo(frame.body.toString("utf8"));
   }
 
@@ -42,7 +40,7 @@ export class FileSystem {
       extractBody(req),
       extractExtraData(req),
     );
-    this.handleError(frame);
+    assertOkFrame(frame);
 
     const { entries } = parseDirlistResponse(frame.body);
     return { name: path, entries };
@@ -55,7 +53,7 @@ export class FileSystem {
       extractBody(req),
       extractExtraData(req),
     );
-    this.handleError(frame);
+    assertOkFrame(frame);
   }
 
   async rmdir(path: string): Promise<void> {
@@ -65,7 +63,7 @@ export class FileSystem {
       extractBody(req),
       extractExtraData(req),
     );
-    this.handleError(frame);
+    assertOkFrame(frame);
   }
 
   async rm(path: string): Promise<void> {
@@ -75,7 +73,7 @@ export class FileSystem {
       extractBody(req),
       extractExtraData(req),
     );
-    this.handleError(frame);
+    assertOkFrame(frame);
   }
 
   async mv(source: string, target: string): Promise<void> {
@@ -85,13 +83,6 @@ export class FileSystem {
       extractBody(req),
       extractExtraData(req),
     );
-    this.handleError(frame);
-  }
-
-  private handleError(frame: Frame): void {
-    if (frame.status === ResponseStatus.Error) {
-      const { errnum, errmsg } = parseErrorResponse(frame.body);
-      throw new XRootDError(errnum, errmsg);
-    }
+    assertOkFrame(frame);
   }
 }

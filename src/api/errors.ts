@@ -1,4 +1,6 @@
-import { ClientError, ServerError } from "../protocol/constants.ts";
+import { ClientError, ResponseStatus, ServerError } from "../protocol/constants.ts";
+import type { Frame } from "../transport/framer.ts";
+import { parseErrorResponse } from "../protocol/message.ts";
 
 /** Error codes that can be used with XRootDError. */
 export type ErrorCode = ServerError | ClientError;
@@ -77,5 +79,16 @@ export class XRootDError extends Error {
 
   static codeToMessage(code: ErrorCode | number): string {
     return codeMessages[code as ErrorCode] ?? `Unknown error (${code})`;
+  }
+}
+
+/**
+ * Assert that a response frame has status kXR_ok.
+ * Throws XRootDError if the frame has an error status.
+ */
+export function assertOkFrame(frame: Frame): void {
+  if (frame.status === ResponseStatus.Error) {
+    const { errnum, errmsg } = parseErrorResponse(frame.body);
+    throw new XRootDError(errnum, errmsg);
   }
 }
