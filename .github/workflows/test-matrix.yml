@@ -80,10 +80,10 @@ jobs:
             chmod -R 777 .
             
             # 2. 切换到系统内置的非特权用户 (daemon) 来在后台启动 xrootd
-            su -s /bin/sh daemon -c "MOCK_ROOT_DIR=\"$PWD/mock-server\" nohup xrootd -c mock-server/config/xrootd-ci.cfg -p 1094 > xrootd-server.log 2>&1 &"
+            su -s /bin/sh daemon -c "MOCKROOT=\"$PWD/mock-server\" nohup xrootd -c mock-server/config/xrootd-ci.cfg -p 1094 > xrootd-server.log 2>&1 &"
           else
             echo "Detected non-root user (macOS environment). Running directly..."
-            MOCK_ROOT_DIR="$PWD/mock-server" nohup xrootd -c mock-server/config/xrootd-ci.cfg -p 1094 > xrootd-server.log 2>&1 &
+            MOCKROOT="$PWD/mock-server" nohup xrootd -c mock-server/config/xrootd-ci.cfg -p 1094 > xrootd-server.log 2>&1 &
           fi
 
           echo "Sleeping 10 seconds...."
