@@ -52,7 +52,7 @@ export interface StatInfo {
  *   - group:  file group
  */
 export function createStatInfo(data: string): StatInfo {
-  const parts = data.trim().split(/\s+/);
+  const parts = data.trim().replace(/\0+$/, "").split(/\s+/);
   const id = parts[0] ?? "0";
   const size = BigInt(parts[1] ?? "0");
   const serverFlags = parseInt(parts[2] ?? "0", 10) || 0;
@@ -129,4 +129,10 @@ export interface DirectoryEntry {
   size: number;
   flags: number;
   mtime: number;
+  /** Extended fields populated when dstat option is used */
+  ctime?: number;
+  atime?: number;
+  mode?: number;
+  owner?: string;
+  group?: string;
 }

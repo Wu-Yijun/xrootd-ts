@@ -10,7 +10,7 @@ import {
   parseDirlistResponse,
   parseErrorResponse,
 } from "../protocol/message.ts";
-import { RequestId, ResponseStatus } from "../protocol/constants.ts";
+import { RequestId, ResponseStatus, DirlistOptions } from "../protocol/constants.ts";
 import { XRootDError } from "./errors.ts";
 import type { DirectoryList, StatInfo } from "./types.ts";
 import { createStatInfo } from "./types.ts";
@@ -34,8 +34,9 @@ export class FileSystem {
     return createStatInfo(frame.body.toString("utf8"));
   }
 
-  async readdir(path: string): Promise<DirectoryList> {
-    const req = buildDirlistRequest(0, path);
+  async readdir(path: string, options?: { dstat?: boolean }): Promise<DirectoryList> {
+    const flags = options?.dstat ? DirlistOptions.Dstat : 0;
+    const req = buildDirlistRequest(0, path, flags);
     const frame = await this.getMux().request(
       RequestId.Dirlist,
       extractBody(req),

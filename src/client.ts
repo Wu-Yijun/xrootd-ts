@@ -186,9 +186,9 @@ export class XRootDClient {
     return this.fs!.stat(path);
   }
 
-  async readdir(path: string): Promise<DirectoryList> {
+  async readdir(path: string, options?: { dstat?: boolean }): Promise<DirectoryList> {
     this.ensureFileSystem();
-    return this.fs!.readdir(path);
+    return this.fs!.readdir(path, options);
   }
 
   async mkdir(path: string, mode?: number): Promise<void> {

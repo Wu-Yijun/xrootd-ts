@@ -249,14 +249,22 @@ export function parseDirlistResponse(body: Buffer): DirlistResponse {
     // Lines come in pairs: name, statinfo
     for (let i = 0; i < lines.length - 1; i += 2) {
       const name = lines[i];
-      const statFields = lines[i + 1]?.split(/\s+/);
+      const statFields = lines[i + 1]?.replace(/\0+$/, "").split(/\s+/);
       if (statFields && statFields.length >= 4) {
-        entries.push({
+        const entry: DirectoryEntry = {
           name,
           size: parseInt(statFields[1], 10) || 0,
           flags: parseInt(statFields[2], 10) || 0,
           mtime: parseInt(statFields[3], 10) || 0,
-        });
+        };
+        if (statFields.length >= 9) {
+          entry.ctime = parseInt(statFields[4], 10) || 0;
+          entry.atime = parseInt(statFields[5], 10) || 0;
+          entry.mode = parseInt(statFields[6], 8) || 0;
+          entry.owner = statFields[7] || "";
+          entry.group = statFields[8] || "";
+        }
+        entries.push(entry);
       }
     }
   } else {
