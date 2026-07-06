@@ -122,6 +122,29 @@ export function parseSecToken(token: Uint8Array): string[] {
 }
 
 /**
+ * Extract the Kerberos SPN prefix from secToken for a given protocol.
+ *
+ * secToken format: "&P=krb5,<prefix>/<realm>&P=unix&P=sss"
+ * Returns the prefix part before '/' (e.g. "xrootd" or "host").
+ *
+ * Example:
+ *   "&P=krb5,host/eos07.ihep.ac.cn@IHEPKRB5&P=unix" → "host"
+ *   "&P=krb5,xrootd/eos01.ihep.ac.cn@IHEPKRB5&P=unix" → "xrootd"
+ */
+export function parseSpnPrefix(
+  token: Uint8Array,
+  protocol: string,
+): string | undefined {
+  const str = Buffer.from(token).toString("utf8");
+  const re = new RegExp(`&P=${protocol},([^&]+)`);
+  const match = re.exec(str);
+  if (!match) return undefined;
+  const spn = match[1];
+  const slashIdx = spn.indexOf("/");
+  return slashIdx !== -1 ? spn.substring(0, slashIdx) : undefined;
+}
+
+/**
  * Parse kXR_login OK response body.
  *
  * Body layout:

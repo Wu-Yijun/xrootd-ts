@@ -37,18 +37,26 @@ export async function doAuthentication(
     ? authProtocols.filter((p) => filter.includes(p))
     : authProtocols;
 
+  let lastError: Error | null = null;
+
   for (const protoName of candidates) {
     const factory = authProtocolRegistry.get(protoName);
     if (!factory) continue;
 
     const protocol = factory();
-    return await executeAuth(mux, protocol, params);
+    try {
+      return await executeAuth(mux, protocol, params);
+    } catch (err) {
+      lastError = err as Error;
+      // Protocol failed, try the next one (fallback behavior matching C++ client)
+    }
   }
 
   throw new XRootDError(
     ServerError.AuthFailed,
-    `No supported authentication protocol. Server requires: ${authProtocols.join(", ")}` +
-      (filter ? `. Allowed: ${filter.join(",")}` : ""),
+    `All authentication methods failed. Server requires: ${authProtocols.join(", ")}` +
+      (filter ? `. Allowed: ${filter.join(",")}` : "") +
+      (lastError ? `. Last error: ${lastError.message}` : ""),
   );
 }
 

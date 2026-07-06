@@ -93,6 +93,7 @@ export class XRootDClient {
           username: authConfig.username,
           password: authConfig.password,
           sessid: this.session.sessid,
+          spnPrefix: this.session.spnPrefix,
         },
         { protocolFilter: secEnv?.protocolFilter },
       );

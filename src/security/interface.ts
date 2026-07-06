@@ -4,6 +4,8 @@ export interface AuthParams {
   username?: string;
   password?: string;
   sessid: Uint8Array;
+  /** Kerberos SPN prefix parsed from server secToken (e.g. "xrootd" or "host"). */
+  spnPrefix?: string;
 }
 
 export interface SecEntity {

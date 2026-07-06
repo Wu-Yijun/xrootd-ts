@@ -16,6 +16,7 @@ import {
   parseProtocolResponse,
   parseRedirectResponse,
   parseSecToken,
+  parseSpnPrefix,
 } from "../protocol/message.ts";
 import { createFrameReader } from "../utils/frame-reader.ts";
 import { XRootDError } from "../api/errors.ts";
@@ -33,6 +34,8 @@ export interface Session {
   authProtocols?: string[];
   /** Whether the server sent a secToken in login response (auth required). */
   needsAuth: boolean;
+  /** Kerberos SPN prefix parsed from secToken (e.g. "xrootd" or "host"). */
+  spnPrefix?: string;
 }
 
 /**
@@ -124,6 +127,12 @@ export async function handshake(
 
     const loginResp = parseLoginResponse(loginFrame.body);
 
+    // Parse SPN prefix from secToken (e.g. "xrootd" from "&P=krb5,xrootd/eos01...")
+    let spnPrefix: string | undefined;
+    if (loginResp.secToken) {
+      spnPrefix = parseSpnPrefix(loginResp.secToken, "krb5");
+    }
+
     return {
       sessid: loginResp.sessid,
       protocolVersion: protoResp.pval,
@@ -131,6 +140,7 @@ export async function handshake(
       bifReqs: protoResp.bifReqs,
       authProtocols: loginResp.secToken ? parseSecToken(loginResp.secToken) : undefined,
       needsAuth: loginResp.needsAuth,
+      spnPrefix,
     };
   } finally {
     reader.close();
