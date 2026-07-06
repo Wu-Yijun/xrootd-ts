@@ -54,9 +54,10 @@ export class Krb5Auth implements SecurityProtocol {
     // The token is base64 encoded, decode it to bytes
     const tokenBytes = Buffer.from(token, "base64");
 
-    // Encode as "krb5" + token
-    const encoder = new TextEncoder();
-    const prefix = encoder.encode("krb5");
+    // Encode as "krb5\0" + token
+    // The null terminator is required by the C++ server which uses strcmp()
+    // to match the protocol name in the credential buffer.
+    const prefix = new Uint8Array([0x6b, 0x72, 0x62, 0x35, 0x00]); // "krb5\0"
 
     const result = new Uint8Array(prefix.length + tokenBytes.length);
     result.set(prefix);

@@ -6,7 +6,6 @@ import type {
 import type { Multiplexer } from "../transport/multiplexer.ts";
 import {
   ClientError,
-  CRED_TYPE,
   RequestId,
   ResponseStatus,
   ServerError,
@@ -59,14 +58,12 @@ async function executeAuth(
   params: AuthParams,
 ): Promise<SecEntity> {
   const creds = await protocol.getCredentials(params);
-  const credType = getCredType(protocol.name);
 
-  // Build auth body: reserved[12] + credType[4]
+  // Build auth body: reserved[12] + credtype[4]
+  // credtype is a 4-byte protocol name string (e.g. "krb5", "host"), NOT a numeric value.
   const body = new Uint8Array(16);
-  body[12] = (credType >> 24) & 0xff;
-  body[13] = (credType >> 16) & 0xff;
-  body[14] = (credType >> 8) & 0xff;
-  body[15] = credType & 0xff;
+  const nameBytes = new TextEncoder().encode(protocol.name);
+  body.set(nameBytes.subarray(0, 4), 12);
 
   let frame = await mux.request(
     RequestId.Auth,
@@ -93,15 +90,4 @@ async function executeAuth(
   }
 
   return protocol.getEntity();
-}
-
-function getCredType(name: string): number {
-  const credType = CRED_TYPE[name];
-  if (credType === undefined) {
-    throw new XRootDError(
-      ClientError.BadRequest,
-      `Unknown auth protocol: ${name}`,
-    );
-  }
-  return credType;
 }

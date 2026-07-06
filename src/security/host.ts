@@ -6,9 +6,9 @@ export class HostAuth implements SecurityProtocol {
   private complete = false;
 
   async getCredentials(params: AuthParams): Promise<Uint8Array> {
-    const hostname = params.host || "unknown";
-    const encoder = new TextEncoder();
-    return encoder.encode(hostname);
+    // C++ host protocol sends "host\0" (5 bytes) as credential data.
+    // The null terminator is required for PManager.Find() strcmp() matching.
+    return new Uint8Array([0x68, 0x6f, 0x73, 0x74, 0x00]); // "host\0"
   }
 
   async processChallenge(_challenge: Uint8Array): Promise<Uint8Array> {
