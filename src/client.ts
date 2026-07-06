@@ -25,6 +25,11 @@ export interface XRootDClientOptions {
   };
   timeout?: number;
   maxRedirects?: number;
+  /** TLS configuration for roots:// connections. */
+  tls?: {
+    /** Whether to verify server certificate. Defaults to false. */
+    rejectUnauthorized?: boolean;
+  };
   /** Security environment configuration. Enables credential auto-discovery and protocol filtering. */
   secEnv?: SecEnv;
 }
@@ -49,7 +54,7 @@ export class XRootDClient {
 
   private async doConnect(url: XRootDUrl): Promise<void> {
     this.transport = new Transport();
-    await this.transport.connect(url.host, url.port);
+    await this.transport.connect(url.host, url.port, url.isSecure(), this.options.tls);
 
     this.mux = new Multiplexer(this.transport, {
       maxRedirects: this.options.maxRedirects ?? DEFAULT_MAX_REDIRECTS,
@@ -100,7 +105,10 @@ export class XRootDClient {
       this.session.secEntity = secEntity;
     }
 
-    this.fs = new FileSystem(() => this.mux!);
+    this.fs = new FileSystem(() => {
+      if (!this.mux) throw new XRootDError(ClientError.Uninitialized, "Client not connected");
+      return this.mux;
+    });
   }
 
   private async handleRedirect(host: string, port: number, pending: DetachedRequest): Promise<void> {
@@ -149,7 +157,10 @@ export class XRootDClient {
         requestData = merged;
       }
 
-      this.mux!.request(pending.requestId, pending.body, requestData)
+      if (!this.mux) {
+        throw new XRootDError(ClientError.Uninitialized, "Client not connected after redirect");
+      }
+      this.mux.request(pending.requestId, pending.body, requestData)
         .then(pending.resolve)
         .catch(pending.reject);
     } catch (err) {
@@ -162,17 +173,17 @@ export class XRootDClient {
     path: string,
     options?: { flags?: number; mode?: number },
   ): Promise<File> {
-    this.ensureConnected();
+    const mux = this.ensureConnected();
 
-    const file = new File(() => this.mux!);
+    const file = new File(() => mux);
     await file.open(path, options);
     return file;
   }
 
   async stat(path: string): Promise<StatInfo> {
-    this.ensureConnected();
+    const mux = this.ensureConnected();
 
-    const file = new File(() => this.mux!);
+    const file = new File(() => mux);
     await file.open(path, { flags: OpenFlags.Read });
     try {
       return await file.stat();
@@ -182,33 +193,27 @@ export class XRootDClient {
   }
 
   async statFilesystem(path: string): Promise<StatInfo> {
-    this.ensureFileSystem();
-    return this.fs!.stat(path);
+    return this.ensureFileSystem().stat(path);
   }
 
   async readdir(path: string, options?: { dstat?: boolean }): Promise<DirectoryList> {
-    this.ensureFileSystem();
-    return this.fs!.readdir(path, options);
+    return this.ensureFileSystem().readdir(path, options);
   }
 
   async mkdir(path: string, mode?: number): Promise<void> {
-    this.ensureFileSystem();
-    return this.fs!.mkdir(path, mode);
+    return this.ensureFileSystem().mkdir(path, mode);
   }
 
   async rmdir(path: string): Promise<void> {
-    this.ensureFileSystem();
-    return this.fs!.rmdir(path);
+    return this.ensureFileSystem().rmdir(path);
   }
 
   async rm(path: string): Promise<void> {
-    this.ensureFileSystem();
-    return this.fs!.rm(path);
+    return this.ensureFileSystem().rm(path);
   }
 
   async mv(source: string, target: string): Promise<void> {
-    this.ensureFileSystem();
-    return this.fs!.mv(source, target);
+    return this.ensureFileSystem().mv(source, target);
   }
 
   async close(): Promise<void> {
@@ -234,15 +239,17 @@ export class XRootDClient {
     return this.url.getLocation();
   }
 
-  private ensureConnected(): void {
+  private ensureConnected(): Multiplexer {
     if (!this.mux || !this.session) {
       throw new XRootDError(ClientError.Uninitialized, "Client not connected");
     }
+    return this.mux;
   }
 
-  private ensureFileSystem(): void {
+  private ensureFileSystem(): FileSystem {
     if (!this.fs) {
       throw new XRootDError(ClientError.Uninitialized, "Client not connected");
     }
+    return this.fs;
   }
 }

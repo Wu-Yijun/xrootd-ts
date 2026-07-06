@@ -23,9 +23,9 @@ export class Transport implements ITransport {
   private dataHandlers: ((chunk: Buffer) => void)[] = [];
   private dataListenerInstalled = false;
 
-  async connect(host: string, port: number, useTls = false): Promise<void> {
+  async connect(host: string, port: number, useTls = false, tlsOptions?: { rejectUnauthorized?: boolean }): Promise<void> {
     this.socket = useTls
-      ? await this.tlsConnect(host, port)
+      ? await this.tlsConnect(host, port, tlsOptions)
       : await this.tcpConnect(host, port);
 
     this.socket.on("close", () => {
@@ -89,10 +89,10 @@ export class Transport implements ITransport {
     });
   }
 
-  private tlsConnect(host: string, port: number): Promise<tls.TLSSocket> {
+  private tlsConnect(host: string, port: number, tlsOptions?: { rejectUnauthorized?: boolean }): Promise<tls.TLSSocket> {
     return new Promise((resolve, reject) => {
       const socket = tls.connect(
-        { host, port, rejectUnauthorized: false },
+        { host, port, rejectUnauthorized: tlsOptions?.rejectUnauthorized ?? false },
         () => resolve(socket),
       );
       socket.once("error", reject);

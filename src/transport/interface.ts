@@ -1,5 +1,5 @@
 export interface ITransport {
-  connect(host: string, port: number, useTls?: boolean): Promise<void>;
+  connect(host: string, port: number, useTls?: boolean, tlsOptions?: { rejectUnauthorized?: boolean }): Promise<void>;
   send(data: Buffer): Promise<void>;
   onData(callback: (chunk: Buffer) => void): void;
   removeDataHandler(callback: (chunk: Buffer) => void): void;
