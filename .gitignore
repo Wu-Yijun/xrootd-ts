@@ -2,6 +2,7 @@ node_modules/
 dist/
 /xrootd/
 /xrootd-binding/
+/temp/
 /.vscode/
 /.VSCodeCounter/
 *.tsbuildinfo

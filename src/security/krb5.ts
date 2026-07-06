@@ -1,5 +1,7 @@
 import type { AuthParams, SecEntity, SecurityProtocol } from "./interface.ts";
 
+let DEBUG_cnt = 0;
+
 let kerberosModule: typeof import("kerberos") | null = null;
 
 async function loadKerberos(): Promise<typeof import("kerberos")> {
@@ -30,6 +32,7 @@ export class Krb5Auth implements SecurityProtocol {
    * Returns true if the `kerberos` npm package can be loaded.
    */
   static isSupported(): boolean {
+    return false; // TODO: disabled
     try {
       require.resolve("kerberos");
       return true;
@@ -42,7 +45,8 @@ export class Krb5Auth implements SecurityProtocol {
     const kerberos = await loadKerberos();
 
     // Build the service principal: xrootd@<hostname>
-    const servicePrincipal = `xrootd@${params.host}`;
+    console.log(`DEBUG: Krb5Auth.getCredentials() called for host=${params.host}, username=${params.username}`);
+    const servicePrincipal = `${DEBUG_cnt++ % 2 === 0 ? "xrootd" : "host"}@${params.host}`;
 
     // Initialize the Kerberos client
     const kerberosClient = await kerberos.initializeClient(servicePrincipal);
