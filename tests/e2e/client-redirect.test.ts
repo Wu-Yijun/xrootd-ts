@@ -3,8 +3,6 @@ import assert from "node:assert/strict";
 import net from "node:net";
 import { Transport } from "../../src/transport/transport.ts";
 import { Multiplexer } from "../../src/transport/multiplexer.ts";
-import { File } from "../../src/api/file.ts";
-import type { Session } from "../../src/session/handshake.ts";
 
 function buildResponseFrame(
   streamId: number,
