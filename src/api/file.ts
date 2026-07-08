@@ -230,6 +230,17 @@ export class File {
   }
 
   async close(): Promise<void> {
+    if (this.isClosed) {
+      return;
+    }
+
+    if (this.pendingOperations > 0) {
+      const errMsg = `[XRootD Client] Warning: file.close() called but there are ${this.pendingOperations} pending operations! Did you forget to 'await' a file.write()?`;
+      throw new XRootDError(ServerError.InternalError, errMsg);
+    }
+
+    this.isClosed = true;
+
     if (!this._isOpen || !this.fhandle) {
       return;
     }
