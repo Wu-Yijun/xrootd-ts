@@ -34,7 +34,9 @@ class MockTransport implements ITransport {
     this.closed = true;
   }
   destroy(): void {}
-  onData(_callback: (chunk: Buffer) => void): void {}
+  onData(callback: (chunk: Buffer) => void): void {
+    this.dataCallback = callback;
+  }
   removeDataHandler(_callback: (chunk: Buffer) => void): void {}
   onClose(_callback: () => void): void {}
   onError(_callback: (err: Error) => void): void {}
