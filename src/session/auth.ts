@@ -4,6 +4,7 @@ import type {
   SecurityProtocol,
 } from "../security/interface.ts";
 import type { Multiplexer } from "../transport/multiplexer.ts";
+import type { ResolvedAuthConfig } from "../config/loader.ts";
 import {
   ClientError,
   RequestId,
@@ -13,11 +14,22 @@ import {
 import { parseErrorResponse } from "../protocol/message.ts";
 import { XRootDError } from "../api/errors.ts";
 
-const authProtocolRegistry = new Map<string, () => SecurityProtocol>();
+/**
+ * Auth protocol registry: maps protocol name to a factory function.
+ *
+ * The factory receives the current connection's auth config at call time,
+ * allowing per-connection credentials (e.g. SSS keytab) instead of
+ * module-level singletons. Config-agnostic protocols (host, unix, krb5)
+ * simply ignore the parameter.
+ */
+const authProtocolRegistry = new Map<
+  string,
+  (authConfig?: ResolvedAuthConfig) => SecurityProtocol
+>();
 
 export function registerAuthProtocol(
   name: string,
-  factory: () => SecurityProtocol,
+  factory: (authConfig?: ResolvedAuthConfig) => SecurityProtocol,
 ): void {
   authProtocolRegistry.set(name, factory);
 }
@@ -26,13 +38,17 @@ export async function doAuthentication(
   mux: Multiplexer,
   authProtocols: string[],
   params: AuthParams,
-  options?: { protocolFilter?: string[] },
+  options?: {
+    protocolFilter?: string[];
+    authConfig?: ResolvedAuthConfig;
+  },
 ): Promise<SecEntity> {
   if (authProtocols.length === 0) {
     return { prot: "", uid: 0, gid: 0 };
   }
 
   const filter = options?.protocolFilter;
+  const authConfig = options?.authConfig;
   const candidates = filter?.length
     ? authProtocols.filter((p) => filter.includes(p))
     : authProtocols;
@@ -43,7 +59,7 @@ export async function doAuthentication(
     const factory = authProtocolRegistry.get(protoName);
     if (!factory) continue;
 
-    const protocol = factory();
+    const protocol = factory(authConfig);
     try {
       return await executeAuth(mux, protocol, params);
     } catch (err) {

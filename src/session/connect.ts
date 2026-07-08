@@ -15,27 +15,27 @@ import { DEFAULT_MAX_REDIRECTS } from "../protocol/constants.ts";
 import { ClientError } from "../protocol/constants.ts";
 import { XRootDError } from "../api/errors.ts";
 
-let authProtocolsRegistered = false;
-
-function ensureAuthProtocolsRegistered(
-  url: XRootDUrl,
-  credentials?: { username: string; password?: string },
-  secEnv?: SecEnv,
-): void {
-  if (authProtocolsRegistered) return;
-
-  const authConfig = loadAuthConfig({ url, credentials, secEnv });
-
+/**
+ * Register auth protocol factories. Called on every connection to ensure
+ * factories are available. Registration is idempotent (Map.set overwrites).
+ *
+ * Config-agnostic protocols (host, unix, krb5) ignore the authConfig param.
+ * SSS reads the keytab from authConfig at call time, not registration time,
+ * so each connection uses its own credentials.
+ */
+function registerAuthProtocols(): void {
   registerAuthProtocol("host", () => new HostAuth());
   registerAuthProtocol("unix", () => new UnixAuth());
-  if (authConfig.sssKey && SSSAuth.isSupported()) {
-    registerAuthProtocol("sss", () => new SSSAuth(authConfig.sssKey!));
-  }
-  if (Krb5Auth.isSupported()) {
-    registerAuthProtocol("krb5", () => new Krb5Auth());
-  }
-
-  authProtocolsRegistered = true;
+  registerAuthProtocol("sss", (authConfig) => {
+    if (authConfig?.sssKey && SSSAuth.isSupported()) {
+      return new SSSAuth(authConfig.sssKey);
+    }
+    // SSS not available for this connection — return a stub that will fail
+    // gracefully when getCredentials is called (the protocol won't match
+    // what the server requires, so it will be skipped in the fallback chain).
+    throw new Error("SSS not available: no keytab configured");
+  });
+  registerAuthProtocol("krb5", () => new Krb5Auth());
 }
 
 export interface ConnectOptions {
@@ -66,7 +66,13 @@ export async function connectToHost(
   url: XRootDUrl,
   options: ConnectOptions = {},
 ): Promise<ConnectionResult> {
-  ensureAuthProtocolsRegistered(url, options.credentials, options.secEnv);
+  registerAuthProtocols();
+
+  const authConfig = loadAuthConfig({
+    url,
+    credentials: options.credentials,
+    secEnv: options.secEnv,
+  });
 
   const transport = new Transport();
   await transport.connect(
@@ -98,12 +104,6 @@ export async function connectToHost(
   }
 
   if (session.needsAuth && session.authProtocols?.length) {
-    const authConfig = loadAuthConfig({
-      url,
-      credentials: options.credentials,
-      secEnv: options.secEnv,
-    });
-
     try {
       const secEntity = await doAuthentication(
         mux,
@@ -116,7 +116,10 @@ export async function connectToHost(
           sessid: session.sessid,
           spnPrefix: session.spnPrefix,
         },
-        { protocolFilter: options.secEnv?.protocolFilter },
+        {
+          protocolFilter: options.secEnv?.protocolFilter,
+          authConfig,
+        },
       );
       session.secEntity = secEntity;
     } catch (err) {
