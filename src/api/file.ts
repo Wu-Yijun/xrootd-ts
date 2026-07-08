@@ -192,23 +192,32 @@ export class File {
   }
 
   async write(offset: number, data: Uint8Array): Promise<number> {
+    if (this.isClosed) {
+      throw new XRootDError(ServerError.FileNotOpen, "File is closed");
+    }
+
     if (!this._isOpen || !this.fhandle) {
       throw new XRootDError(ServerError.FileNotOpen, "File is not open");
     }
 
-    const buf = buildWriteRequest(0, this.fhandle, offset, data);
-    const frame = await sendRequest(this.mux!, buf, data);
+    this.pendingOperations++;
+    try {
+      const buf = buildWriteRequest(0, this.fhandle, offset, data);
+      const frame = await sendRequest(this.mux!, buf, data);
 
-    assertOkFrame(frame);
+      assertOkFrame(frame);
 
-    if (frame.status === ResponseStatus.Ok) {
-      return frame.dlen > 0 ? frame.dlen : data.length;
+      if (frame.status === ResponseStatus.Ok) {
+        return frame.dlen > 0 ? frame.dlen : data.length;
+      }
+
+      throw new XRootDError(
+        ServerError.ServerError,
+        `Unexpected write response status: ${frame.status}`,
+      );
+    } finally {
+      this.pendingOperations--;
     }
-
-    throw new XRootDError(
-      ServerError.ServerError,
-      `Unexpected write response status: ${frame.status}`,
-    );
   }
 
   async close(): Promise<void> {
