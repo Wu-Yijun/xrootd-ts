@@ -39,6 +39,8 @@ export class File {
   private mux: Multiplexer | null = null;
   private fhandle: Uint8Array | null = null;
   private _isOpen = false;
+  private pendingOperations = 0;
+  private isClosed = false;
 
   constructor(options: FileConnectionOptions) {
     this.options = options;
