@@ -14,6 +14,7 @@ import {
 } from "../protocol/message.ts";
 import { parseRedirectResponse } from "../protocol/message.ts";
 import {
+  ClientError,
   OpenFlags,
   ResponseStatus,
   ServerError,
@@ -236,7 +237,7 @@ export class File {
 
     if (this.pendingOperations > 0) {
       const errMsg = `[XRootD Client] Warning: file.close() called but there are ${this.pendingOperations} pending operations! Did you forget to 'await' a file.write()?`;
-      throw new XRootDError(ServerError.InternalError, errMsg);
+      throw new XRootDError(ClientError.InternalError, errMsg);
     }
 
     this.isClosed = true;
