@@ -34,24 +34,38 @@
 
 **问题类型**: 测试文件断言错误（测试内部自相矛盾）
 
-**问题描述**: 两个测试与同文件其他测试矛盾：
-- 第 19-24 行 "returns hostname as credentials" 断言凭据是 `"testhost.example.com"`
-- 第 26-31 行 'returns "unknown" when host is empty' 断言凭据是 `"unknown"`
-- 但第 50-56 行 "credentials contain NUL terminator" 断言 `creds.length === 5`，证实凭据实际是 `"host\0"`（5 字节）
+**修复方案**: 将断言改为验证实际返回值 `"host\0"`。
 
-**源码分析** (`src/security/host.ts:8-12`):
+**状态**: 已修复 (commit c1776b9)
+
+---
+
+## 5. src/api/filesystem.test.ts 全部 16 个测试 - FileSystem 构造函数参数错误
+
+**问题类型**: 测试文件参数错误
+
+**问题描述**: 测试使用 `new FileSystem(mux)` 直接传入 Multiplexer 实例，但源码构造函数期望接收一个工厂函数 `() => Multiplexer`。
+
+**源码分析** (`src/api/filesystem.ts:17-22`):
 ```typescript
-async getCredentials(params: AuthParams): Promise<Uint8Array> {
-  // C++ host protocol sends "host\0" (5 bytes) as credential data.
-  // The null terminator is required for PManager.Find() strcmp() matching.
-  return new TextEncoder().encode("host\0");
+export class FileSystem {
+  private readonly getMux: () => Multiplexer;
+
+  constructor(getMux: () => Multiplexer) {
+    this.getMux = getMux;
+  }
 }
 ```
 
-源码行为正确，与 XRootD C++ 参考实现一致。host 协议凭据是固定字符串 `"host\0"`，不依赖 params.host。
+调用处 (`src/api/filesystem.ts:26`):
+```typescript
+const frame = await sendRequest(this.getMux(), req);
+```
 
-**问题来源**: 测试编写者未理解 host 协议规范，错误假设凭据应是 hostname。同文件第 50-56 行的测试已正确验证了实际行为。
+**错误信息**: `TypeError: this.getMux is not a function`
 
-**修复方案**: 将第 19-24 行和第 26-31 行的断言改为验证实际返回值 `"host\0"`。
+**问题来源**: 测试编写时源码构造函数签名可能尚未改为工厂函数模式，测试未同步更新。
+
+**修复方案**: 将 `new FileSystem(mux)` 改为 `new FileSystem(() => mux)`。
 
 **状态**: 待修复

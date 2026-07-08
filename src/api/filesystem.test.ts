@@ -68,7 +68,7 @@ describe("FileSystem", () => {
   beforeEach(() => {
     transport = new MockTransport();
     mux = new Multiplexer(transport);
-    fs = new FileSystem(mux);
+    fs = new FileSystem(() => mux);
   });
 
   afterEach(() => {
