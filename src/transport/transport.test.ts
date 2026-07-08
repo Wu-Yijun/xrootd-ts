@@ -3,24 +3,31 @@ import assert from "node:assert/strict";
 import net from "node:net";
 import { Transport } from "./transport.ts";
 
-function createEchoServer(): Promise<{ server: net.Server; port: number }> {
+function createEchoServer(): Promise<{ server: net.Server; port: number; close: () => Promise<void> }> {
   return new Promise((resolve) => {
+    const sockets = new Set<net.Socket>();
     const server = net.createServer((socket) => {
+      sockets.add(socket);
       socket.on("data", (chunk: Buffer) => {
         socket.write(chunk);
       });
+      socket.on("close", () => sockets.delete(socket));
     });
 
     server.listen(0, "127.0.0.1", () => {
       const addr = server.address() as net.AddressInfo;
-      resolve({ server, port: addr.port });
+      const close = () => new Promise<void>((res) => {
+        for (const s of sockets) s.destroy();
+        server.close(() => res());
+      });
+      resolve({ server, port: addr.port, close });
     });
   });
 }
 
 describe("Transport", () => {
   it("connects to a TCP server", async () => {
-    const { server, port } = await createEchoServer();
+    const { port, close } = await createEchoServer();
 
     try {
       const transport = new Transport();
@@ -31,12 +38,12 @@ describe("Transport", () => {
 
       await transport.close();
     } finally {
-      server.close();
+      await close();
     }
   });
 
   it("sends and receives data", async () => {
-    const { server, port } = await createEchoServer();
+    const { port, close } = await createEchoServer();
 
     try {
       const transport = new Transport();
@@ -58,12 +65,12 @@ describe("Transport", () => {
 
       await transport.close();
     } finally {
-      server.close();
+      await close();
     }
   });
 
   it("close destroys the socket", async () => {
-    const { server, port } = await createEchoServer();
+    const { port, close } = await createEchoServer();
 
     try {
       const transport = new Transport();
@@ -79,12 +86,12 @@ describe("Transport", () => {
         assert.ok(err instanceof Error);
       }
     } finally {
-      server.close();
+      await close();
     }
   });
 
   it("destroy destroys the socket", async () => {
-    const { server, port } = await createEchoServer();
+    const { port, close } = await createEchoServer();
 
     try {
       const transport = new Transport();
@@ -100,12 +107,12 @@ describe("Transport", () => {
         assert.ok(err instanceof Error);
       }
     } finally {
-      server.close();
+      await close();
     }
   });
 
   it("handles multiple send/receive cycles", async () => {
-    const { server, port } = await createEchoServer();
+    const { port, close } = await createEchoServer();
 
     try {
       const transport = new Transport();
@@ -130,40 +137,43 @@ describe("Transport", () => {
 
       await transport.close();
     } finally {
-      server.close();
+      await close();
     }
   });
 
   it("connect to non-existent port throws", async () => {
     const transport = new Transport();
-    await assert.rejects(
-      () => transport.connect("127.0.0.1", 1),
-      (err: any) => err instanceof Error,
-    );
+    try {
+      await assert.rejects(
+        () => transport.connect("127.0.0.1", 1),
+        (err: any) => err instanceof Error,
+      );
+    } finally {
+      transport.destroy();
+    }
   });
 
   it("onClose callback is called when remote closes", async () => {
-    const { server, port } = await createEchoServer();
+    const { port, close } = await createEchoServer();
+
+    const transport = new Transport();
+    await transport.connect("127.0.0.1", port);
 
     try {
-      const transport = new Transport();
-      await transport.connect("127.0.0.1", port);
-
       const closePromise = new Promise<void>((resolve) => {
         transport.onClose(() => resolve());
       });
 
       // Close from server side
-      await new Promise<void>((resolve) => {
-        server.close(() => resolve());
-      });
+      await close();
 
       // The socket will detect the close
-      await new Promise((r) => setTimeout(r, 50));
-      // Note: close callback may not fire immediately in all cases
-      // This test verifies the API exists and doesn't throw
-    } catch {
-      // acceptable
+      await Promise.race([
+        closePromise,
+        new Promise((r) => setTimeout(r, 200)),
+      ]);
+    } finally {
+      transport.destroy();
     }
   });
 
@@ -172,10 +182,10 @@ describe("Transport", () => {
     await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
     const addr = server.address() as net.AddressInfo;
 
-    try {
-      const transport = new Transport();
-      await transport.connect("127.0.0.1", addr.port);
+    const transport = new Transport();
+    await transport.connect("127.0.0.1", addr.port);
 
+    try {
       const errorPromise = new Promise<Error>((resolve) => {
         transport.onError((err) => resolve(err));
       });
@@ -190,8 +200,8 @@ describe("Transport", () => {
       ]);
       // We got an error (either the real one or timeout)
       assert.ok(err instanceof Error);
-    } catch {
-      // acceptable
+    } finally {
+      transport.destroy();
     }
   });
 });
