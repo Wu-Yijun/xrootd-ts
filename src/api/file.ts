@@ -266,14 +266,23 @@ export class File {
   }
 
   async sync(): Promise<void> {
+    if (this.isClosed) {
+      throw new XRootDError(ServerError.FileNotOpen, "File is closed");
+    }
+
     if (!this._isOpen || !this.fhandle) {
       throw new XRootDError(ServerError.FileNotOpen, "File is not open");
     }
 
-    const buf = buildSyncRequest(0, this.fhandle);
-    const frame = await sendRequest(this.mux!, buf);
+    this.pendingOperations++;
+    try {
+      const buf = buildSyncRequest(0, this.fhandle);
+      const frame = await sendRequest(this.mux!, buf);
 
-    assertOkFrame(frame);
+      assertOkFrame(frame);
+    } finally {
+      this.pendingOperations--;
+    }
   }
 
   async truncate(size: number): Promise<void> {
