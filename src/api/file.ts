@@ -246,23 +246,32 @@ export class File {
   }
 
   async stat(): Promise<StatInfo> {
+    if (this.isClosed) {
+      throw new XRootDError(ServerError.FileNotOpen, "File is closed");
+    }
+
     if (!this._isOpen || !this.fhandle) {
       throw new XRootDError(ServerError.FileNotOpen, "File is not open");
     }
 
-    const buf = buildStatRequest(0, "", this.fhandle);
-    const frame = await sendRequest(this.mux!, buf);
+    this.pendingOperations++;
+    try {
+      const buf = buildStatRequest(0, "", this.fhandle);
+      const frame = await sendRequest(this.mux!, buf);
 
-    assertOkFrame(frame);
+      assertOkFrame(frame);
 
-    if (frame.status === ResponseStatus.Ok) {
-      return parseStatInfo(frame.body);
+      if (frame.status === ResponseStatus.Ok) {
+        return parseStatInfo(frame.body);
+      }
+
+      throw new XRootDError(
+        ServerError.ServerError,
+        `Unexpected stat response status: ${frame.status}`,
+      );
+    } finally {
+      this.pendingOperations--;
     }
-
-    throw new XRootDError(
-      ServerError.ServerError,
-      `Unexpected stat response status: ${frame.status}`,
-    );
   }
 
   async sync(): Promise<void> {
