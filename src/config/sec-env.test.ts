@@ -172,4 +172,69 @@ describe("SecEnv", () => {
     assert.deepEqual(env.protocolFilter, ["host"]);
     assert.equal(env.gsiCaDir, "");
   });
+
+  describe("XrdSecPROTOCOL boundary cases", () => {
+    it("empty string produces empty array", () => {
+      const env = new SecEnv({ env: { XrdSecPROTOCOL: "" } });
+      assert.deepEqual(env.protocolFilter, []);
+    });
+
+    it("trailing comma is filtered out", () => {
+      const env = new SecEnv({ env: { XrdSecPROTOCOL: "host," } });
+      assert.deepEqual(env.protocolFilter, ["host"]);
+    });
+
+    it("leading comma is filtered out", () => {
+      const env = new SecEnv({ env: { XrdSecPROTOCOL: ",host" } });
+      assert.deepEqual(env.protocolFilter, ["host"]);
+    });
+
+    it("single protocol", () => {
+      const env = new SecEnv({ env: { XrdSecPROTOCOL: "gsi" } });
+      assert.deepEqual(env.protocolFilter, ["gsi"]);
+    });
+  });
+
+  describe("SSS priority", () => {
+    it("XrdSecSSSKT takes priority over XrdSecsssKT", () => {
+      const env = new SecEnv({
+        env: {
+          XrdSecSSSKT: "/primary/key",
+          XrdSecsssKT: "/legacy/key",
+        },
+      });
+      assert.equal(env.sssKeytab, "/primary/key");
+    });
+  });
+
+  describe("all protocols disabled", () => {
+    it("clears all protocol-specific fields", () => {
+      const env = new SecEnv({
+        env: {
+          XrdSecSSSKT: "/etc/key",
+          XrdSecKRB5INITTKN: "1",
+          XrdSecGSICADIR: "/custom/ca",
+          XrdSecPWDSRVPUK: "/custom/puk",
+        },
+        gsi: false,
+        sss: false,
+        krb5: false,
+        pwd: false,
+      });
+      assert.equal(env.sssKeytab, undefined);
+      assert.equal(env.krb5InitToken, false);
+      assert.equal(env.gsiCaDir, "");
+      assert.equal(env.pwdServerPubkey, undefined);
+    });
+  });
+
+  describe("GSI default paths", () => {
+    it("uses hardcoded defaults when no env vars set", () => {
+      const env = new SecEnv({ env: {} });
+      assert.equal(env.gsiCaDir, "/etc/grid-security/certificates");
+      assert.equal(env.gsiCrlDir, "/etc/grid-security/certificates");
+      assert.ok(env.gsiUserCert.includes(".globus/usercert.pem"));
+      assert.ok(env.gsiUserKey.includes(".globus/userkey.pem"));
+    });
+  });
 });

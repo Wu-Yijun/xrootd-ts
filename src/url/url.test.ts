@@ -86,4 +86,51 @@ describe("XRootDUrl", () => {
     const url = new XRootDUrl("root://host.cern.ch");
     assert.equal(url.path, "/");
   });
+
+  it("auto-adds root:// prefix when missing", () => {
+    const url = XRootDUrl.parse("host/path");
+    assert.equal(url.protocol, "root");
+    assert.equal(url.host, "host");
+    assert.equal(url.path, "/path");
+  });
+
+  it("parses user@host without password", () => {
+    const url = new XRootDUrl("root://alice@host/path");
+    assert.equal(url.user, "alice");
+    assert.equal(url.password, undefined);
+  });
+
+  it("roots:// serialization preserves secure prefix", () => {
+    const url = new XRootDUrl("roots://host/path");
+    const str = url.toString();
+    assert.ok(str.startsWith("roots://"));
+    assert.equal(str, "roots://host/path");
+  });
+
+  it("getLocation() and toString() are consistent without credentials", () => {
+    const url = new XRootDUrl("root://host.cern.ch:1095/data");
+    assert.equal(url.getLocation(), url.toString());
+  });
+
+  it("getLocation() and toString() are consistent with credentials", () => {
+    const url = new XRootDUrl("root://alice:pw@host.cern.ch:1095/data");
+    // getLocation() does NOT include credentials, toString() does
+    assert.equal(url.getLocation(), "root://host.cern.ch:1095/data");
+    assert.equal(url.toString(), "root://alice:pw@host.cern.ch:1095/data");
+  });
+
+  it("port 0 is accepted", () => {
+    const url = new XRootDUrl("root://host:0/path");
+    assert.equal(url.port, 0);
+  });
+
+  it("port 65535 (max legal) is accepted", () => {
+    const url = new XRootDUrl("root://host:65535/path");
+    assert.equal(url.port, 65535);
+  });
+
+  it("parses URL with empty path component", () => {
+    const url = new XRootDUrl("root://host:1095");
+    assert.equal(url.path, "/");
+  });
 });

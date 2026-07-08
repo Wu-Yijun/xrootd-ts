@@ -329,4 +329,185 @@ describe("handshake", () => {
 
     mux.close();
   });
+
+  it("uses default username='' and pid=process.pid when no options", async () => {
+    const transport = new MockTransportForHandshake();
+    const mux = new Multiplexer(transport as any);
+    const url = new XRootDUrl("root://host.cern.ch/data");
+
+    const sessionPromise = handshake(mux, url);
+
+    await new Promise((r) => setTimeout(r, 10));
+    transport.emit(makeServerInitFrame());
+    await new Promise((r) => setTimeout(r, 10));
+    transport.emit(makeProtocolResponseFrame());
+    await new Promise((r) => setTimeout(r, 10));
+    transport.emit(makeLoginResponseFrame());
+
+    await sessionPromise;
+
+    // Second send should be login request with default values
+    const loginSend = transport.sentData[1];
+    assert.equal(loginSend.readUInt16BE(2), 3007); // kXR_login
+    const username = loginSend.toString("utf8", 8, 16).replace(/\0+$/, "");
+    assert.equal(username, ""); // default empty username
+    assert.ok(loginSend.readUInt32BE(4) > 0); // pid should be process.pid
+
+    mux.close();
+  });
+
+  it("parses seclvl from protocol response secReqs struct", async () => {
+    const transport = new MockTransportForHandshake();
+    const mux = new Multiplexer(transport as any);
+    const url = new XRootDUrl("root://host.cern.ch/data");
+
+    const sessionPromise = handshake(mux, url);
+
+    await new Promise((r) => setTimeout(r, 10));
+    transport.emit(makeServerInitFrame());
+    await new Promise((r) => setTimeout(r, 10));
+
+    // Protocol response with secReqs struct containing seclvl
+    const body = Buffer.alloc(8 + 6);
+    body.writeUInt32BE(0x520, 0); // pval
+    body.writeUInt32BE(0x09, 4); // flags
+    body[8] = 0x53; // tag 'S'
+    body[9] = 0; // rsvd
+    body[10] = 0; // secver
+    body[11] = 1; // secopt
+    body[12] = 3; // seclvl (intense)
+    body[13] = 0; // secvsz
+    transport.emit(buildResponseFrame(0, 0, body));
+
+    await new Promise((r) => setTimeout(r, 10));
+    transport.emit(makeLoginResponseFrame());
+
+    const session = await sessionPromise;
+    assert.equal(session.seclvl, 3);
+
+    mux.close();
+  });
+
+  it("parses bifReqs from protocol response", async () => {
+    const transport = new MockTransportForHandshake();
+    const mux = new Multiplexer(transport as any);
+    const url = new XRootDUrl("root://host.cern.ch/data");
+
+    const sessionPromise = handshake(mux, url);
+
+    await new Promise((r) => setTimeout(r, 10));
+    transport.emit(makeServerInitFrame());
+    await new Promise((r) => setTimeout(r, 10));
+
+    // Protocol response with bifReqs struct
+    const bifInfo = "krb5,host";
+    const body = Buffer.alloc(8 + 4 + bifInfo.length);
+    body.writeUInt32BE(0x520, 0); // pval
+    body.writeUInt32BE(0x09, 4); // flags
+    body[8] = 0x42; // tag 'B'
+    body[9] = 0; // rsvd
+    body.writeUInt16BE(bifInfo.length, 10); // bifILen
+    Buffer.from(bifInfo).copy(body, 12);
+    transport.emit(buildResponseFrame(0, 0, body));
+
+    await new Promise((r) => setTimeout(r, 10));
+    transport.emit(makeLoginResponseFrame());
+
+    const session = await sessionPromise;
+    assert.equal(session.bifReqs, "krb5,host");
+
+    mux.close();
+  });
+
+  it("parses spnPrefix from secToken", async () => {
+    const transport = new MockTransportForHandshake();
+    const mux = new Multiplexer(transport as any);
+    const url = new XRootDUrl("root://host.cern.ch/data");
+
+    const sessionPromise = handshake(mux, url);
+
+    await new Promise((r) => setTimeout(r, 10));
+    transport.emit(makeServerInitFrame());
+    await new Promise((r) => setTimeout(r, 10));
+    transport.emit(makeProtocolResponseFrame());
+    await new Promise((r) => setTimeout(r, 10));
+
+    // Login response with krb5 SPN in secToken
+    transport.emit(
+      makeLoginResponseFrame(
+        "&P=krb5,host/eos07.ihep.ac.cn@IHEPKRB5&P=unix",
+      ),
+    );
+
+    const session = await sessionPromise;
+    assert.equal(session.spnPrefix, "host");
+
+    mux.close();
+  });
+
+  it("spnPrefix is undefined when no krb5 entry in secToken", async () => {
+    const transport = new MockTransportForHandshake();
+    const mux = new Multiplexer(transport as any);
+    const url = new XRootDUrl("root://host.cern.ch/data");
+
+    const sessionPromise = handshake(mux, url);
+
+    await new Promise((r) => setTimeout(r, 10));
+    transport.emit(makeServerInitFrame());
+    await new Promise((r) => setTimeout(r, 10));
+    transport.emit(makeProtocolResponseFrame());
+    await new Promise((r) => setTimeout(r, 10));
+    transport.emit(makeLoginResponseFrame("&P=host&P=unix"));
+
+    const session = await sessionPromise;
+    assert.equal(session.spnPrefix, undefined);
+
+    mux.close();
+  });
+
+  it("throws on unexpected protocol response status", async () => {
+    const transport = new MockTransportForHandshake();
+    const mux = new Multiplexer(transport as any);
+    const url = new XRootDUrl("root://host.cern.ch/data");
+
+    const sessionPromise = handshake(mux, url);
+
+    await new Promise((r) => setTimeout(r, 10));
+    transport.emit(makeServerInitFrame());
+    await new Promise((r) => setTimeout(r, 10));
+
+    // Send unexpected status (e.g. 4001 kXR_attn)
+    transport.emit(buildResponseFrame(0, 4001, Buffer.alloc(16)));
+
+    await assert.rejects(
+      sessionPromise,
+      (err: any) => err.message.includes("Unexpected protocol response status"),
+    );
+
+    mux.close();
+  });
+
+  it("throws on unexpected login response status", async () => {
+    const transport = new MockTransportForHandshake();
+    const mux = new Multiplexer(transport as any);
+    const url = new XRootDUrl("root://host.cern.ch/data");
+
+    const sessionPromise = handshake(mux, url);
+
+    await new Promise((r) => setTimeout(r, 10));
+    transport.emit(makeServerInitFrame());
+    await new Promise((r) => setTimeout(r, 10));
+    transport.emit(makeProtocolResponseFrame());
+    await new Promise((r) => setTimeout(r, 10));
+
+    // Send unexpected status (e.g. 4002 kXR_authmore)
+    transport.emit(buildResponseFrame(0, 4002, Buffer.alloc(0)));
+
+    await assert.rejects(
+      sessionPromise,
+      (err: any) => err.message.includes("Unexpected login response status"),
+    );
+
+    mux.close();
+  });
 });
