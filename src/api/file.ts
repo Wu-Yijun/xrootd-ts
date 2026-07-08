@@ -32,6 +32,17 @@ export interface FileConnectionOptions {
   secEnv?: SecEnv;
   timeout?: number;
   maxRedirects?: number;
+  /**
+   * Whether to call socket.unref() so the connection doesn't keep the process alive.
+   * @default false
+   */
+  unrefSockets?: boolean;
+  /**
+   * Idle timeout in milliseconds. Socket is destroyed after this period of no data flow.
+   * Set to 0 to disable (not recommended, requires manual close).
+   * @default 30000
+   */
+  idleTimeout?: number;
 }
 
 const leakDetector = new FinalizationRegistry((leakInfo: { path: string }) => {
@@ -62,7 +73,7 @@ export class File {
 
   async open(
     path: string,
-    options?: { flags?: number; mode?: number },
+    options?: { flags?: number; mode?: number; idleTimeout?: number },
   ): Promise<void> {
     if (this._isOpen) {
       throw new XRootDError(ServerError.FileNotOpen, "File is already open");
@@ -79,6 +90,8 @@ export class File {
           secEnv: this.options.secEnv,
           timeout: this.options.timeout,
           maxRedirects: this.options.maxRedirects,
+          unrefSockets: this.options.unrefSockets,
+          idleTimeout: options?.idleTimeout ?? this.options.idleTimeout,
           onRedirect: (host, port, pending) =>
             this.handleRedirect(host, port, pending),
         });
@@ -145,6 +158,8 @@ export class File {
         secEnv: this.options.secEnv,
         timeout: this.options.timeout,
         maxRedirects: this.options.maxRedirects,
+        unrefSockets: this.options.unrefSockets,
+        idleTimeout: this.options.idleTimeout,
         onRedirect: (h, p, p2) => this.handleRedirect(h, p, p2),
       });
       this.transport = conn.transport;
