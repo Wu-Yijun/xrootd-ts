@@ -150,7 +150,7 @@ export class Multiplexer {
   }
 
   private handleFrame(frame: Frame): void {
-    const sid = bytesToStreamId(frame.streamId);
+    const sid =frame.streamId;
 
     // Control frames (streamId=0) — used during handshake and protocol negotiation.
     // Route to control queue/waiters instead of pending map.
@@ -226,7 +226,7 @@ export class Multiplexer {
       : Buffer.alloc(0);
 
     pending.resolve({
-      streamId: frame.body.subarray(8, 10),
+      streamId: frame.body.readUInt16BE(8),
       status: innerStatus,
       dlen: innerDlen,
       body: innerBody,

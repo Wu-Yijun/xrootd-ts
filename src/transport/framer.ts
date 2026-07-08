@@ -2,7 +2,7 @@ import { RESPONSE_HDR_SIZE } from "../protocol/constants.ts";
 
 /** Complete XRootD response frame */
 export interface Frame {
-  streamId: Buffer;
+  streamId: number;
   status: number;
   dlen: number;
   body: Buffer;
@@ -28,7 +28,7 @@ export class Framer {
       if (this.pending.length < RESPONSE_HDR_SIZE + dlen) break;
 
       frames.push({
-        streamId: this.pending.subarray(0, 2),
+        streamId: this.pending.readUInt16BE(0),
         status: this.pending.readUInt16BE(2),
         dlen,
         body: this.pending.subarray(

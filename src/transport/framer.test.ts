@@ -181,7 +181,7 @@ describe("Framer", () => {
     const frame = makeFrame(0x0000, 0, Buffer.from([1]));
     const frames = framer.feed(frame);
     assert.equal(frames.length, 1);
-    assert.equal(frames[0].streamId.readUInt16BE(0), 0);
+    assert.equal(frames[0].streamId, 0);
   });
 
   it("streamId=0xFFFF is parsed correctly", () => {
@@ -189,7 +189,7 @@ describe("Framer", () => {
     const frame = makeFrame(0xffff, 0, Buffer.from([1]));
     const frames = framer.feed(frame);
     assert.equal(frames.length, 1);
-    assert.equal(frames[0].streamId.readUInt16BE(0), 0xffff);
+    assert.equal(frames[0].streamId, 0xffff);
   });
 
   it("status code 4001 (kXR_attn) is parsed correctly", () => {
@@ -200,6 +200,6 @@ describe("Framer", () => {
     const frames = framer.feed(frame);
     assert.equal(frames.length, 1);
     assert.equal(frames[0].status, 4001);
-    assert.equal(frames[0].streamId.readUInt16BE(0), 42);
+    assert.equal(frames[0].streamId, 42);
   });
 });
