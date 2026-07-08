@@ -144,4 +144,66 @@ describe("putBytes / getBytes", () => {
     const off = putBytes(buf, 3, new Uint8Array([1, 2, 3]));
     assert.equal(off, 6);
   });
+
+  it("length 0 returns empty Uint8Array", () => {
+    const buf = Buffer.from([0xaa, 0xbb]);
+    const [got, off] = getBytes(buf, 0, 0);
+    assert.equal(got.length, 0);
+    assert.equal(off, 0);
+  });
+
+  it("putBytes with empty Uint8Array keeps offset unchanged", () => {
+    const buf = Buffer.alloc(4);
+    const off = putBytes(buf, 2, new Uint8Array(0));
+    assert.equal(off, 2);
+  });
+});
+
+describe("boundary values", () => {
+  it("put16/get16 handles 0xFFFF (uint16 max)", () => {
+    const buf = Buffer.alloc(4);
+    put16(buf, 0, 0xffff);
+    const [val, off] = get16(buf, 0);
+    assert.equal(val, 0xffff);
+    assert.equal(off, 2);
+  });
+
+  it("put16/get16 at non-zero offset", () => {
+    const buf = Buffer.alloc(8);
+    put16(buf, 4, 0x1234);
+    const [val, off] = get16(buf, 4);
+    assert.equal(val, 0x1234);
+    assert.equal(off, 6);
+  });
+
+  it("put32/get32 handles 0xFFFFFFFF (uint32 max)", () => {
+    const buf = Buffer.alloc(8);
+    put32(buf, 0, 0xffffffff);
+    const [val, off] = get32(buf, 0);
+    assert.equal(val, 0xffffffff);
+    assert.equal(off, 4);
+  });
+
+  it("put32/get32 at non-zero offset", () => {
+    const buf = Buffer.alloc(12);
+    put32(buf, 4, 0xdeadbeef);
+    const [val, off] = get32(buf, 4);
+    assert.equal(val, 0xdeadbeef >>> 0);
+    assert.equal(off, 8);
+  });
+
+  it("putString with exact maxLen match", () => {
+    const buf = Buffer.alloc(8);
+    putString(buf, 0, "12345678", 8);
+    const [str] = getString(buf, 0, 8);
+    assert.equal(str, "12345678");
+  });
+
+  it("getString from non-zero offset", () => {
+    const buf = Buffer.alloc(8);
+    buf.write("abcdefgh", 0, "utf8");
+    const [str, off] = getString(buf, 4, 4);
+    assert.equal(str, "efgh");
+    assert.equal(off, 8);
+  });
 });

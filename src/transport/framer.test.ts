@@ -134,4 +134,72 @@ describe("Framer", () => {
     assert.equal(frames[0].dlen, 0);
     assert.equal(frames[0].body.length, 0);
   });
+
+  it("parses 3+ concatenated frames in one chunk", () => {
+    const framer = new Framer();
+    const body1 = Buffer.from([1]);
+    const body2 = Buffer.from([2, 3]);
+    const body3 = Buffer.from([4, 5, 6]);
+    const frame1 = makeFrame(10, 0, body1);
+    const frame2 = makeFrame(20, 4003, body2);
+    const frame3 = makeFrame(30, 0, body3);
+
+    const combined = Buffer.concat([frame1, frame2, frame3]);
+    const frames = framer.feed(combined);
+
+    assert.equal(frames.length, 3);
+    assert.equal(frames[0].dlen, 1);
+    assert.equal(frames[1].status, 4003);
+    assert.equal(frames[2].dlen, 3);
+  });
+
+  it("handles interleaved partial frames across feeds", () => {
+    const framer = new Framer();
+    const body1 = Buffer.from([0xaa, 0xbb]);
+    const body2 = Buffer.from([0xcc]);
+    const frame1 = makeFrame(1, 0, body1);
+    const frame2 = makeFrame(2, 0, body2);
+
+    // Feed 1: first half of frame1
+    const f1 = framer.feed(frame1.subarray(0, 5));
+    assert.equal(f1.length, 0);
+
+    // Feed 2: rest of frame1 + first half of frame2
+    const combined = Buffer.concat([frame1.subarray(5), frame2.subarray(0, 5)]);
+    const f2 = framer.feed(combined);
+    assert.equal(f2.length, 1);
+    assert.equal(f2[0].dlen, 2);
+
+    // Feed 3: rest of frame2
+    const f3 = framer.feed(frame2.subarray(5));
+    assert.equal(f3.length, 1);
+    assert.equal(f3[0].dlen, 1);
+  });
+
+  it("streamId=0x0000 is parsed correctly", () => {
+    const framer = new Framer();
+    const frame = makeFrame(0x0000, 0, Buffer.from([1]));
+    const frames = framer.feed(frame);
+    assert.equal(frames.length, 1);
+    assert.equal(frames[0].streamId, 0);
+  });
+
+  it("streamId=0xFFFF is parsed correctly", () => {
+    const framer = new Framer();
+    const frame = makeFrame(0xffff, 0, Buffer.from([1]));
+    const frames = framer.feed(frame);
+    assert.equal(frames.length, 1);
+    assert.equal(frames[0].streamId, 0xffff);
+  });
+
+  it("status code 4001 (kXR_attn) is parsed correctly", () => {
+    const framer = new Framer();
+    const body = Buffer.alloc(16);
+    body.writeUInt32BE(5008, 0); // actnum
+    const frame = makeFrame(42, 4001, body);
+    const frames = framer.feed(frame);
+    assert.equal(frames.length, 1);
+    assert.equal(frames[0].status, 4001);
+    assert.equal(frames[0].streamId, 42);
+  });
 });

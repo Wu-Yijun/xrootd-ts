@@ -90,6 +90,34 @@ describe("SSSAuth", () => {
       assert.ok(creds.length > 0);
       assert.ok(creds.length % 8 === 0);
     });
+
+    it("same key + same password produces same ciphertext", async () => {
+      const auth1 = new SSSAuth(testKey);
+      const auth2 = new SSSAuth(testKey);
+      const creds1 = await auth1.getCredentials(defaultParams);
+      const creds2 = await auth2.getCredentials(defaultParams);
+      assert.deepEqual([...creds1], [...creds2]);
+    });
+
+    it("handles key of exactly 8 bytes (boundary)", () => {
+      const key8 = Buffer.from([1, 2, 3, 4, 5, 6, 7, 8]);
+      assert.doesNotThrow(() => new SSSAuth(key8));
+    });
+
+    it("throws on key of 9 bytes", () => {
+      const key9 = Buffer.from([1, 2, 3, 4, 5, 6, 7, 8, 9]);
+      assert.throws(
+        () => new SSSAuth(key9),
+        /SSS key must be 8 bytes/,
+      );
+    });
+
+    it("throws on key of 0 bytes", () => {
+      assert.throws(
+        () => new SSSAuth(Buffer.alloc(0)),
+        /SSS key must be 8 bytes/,
+      );
+    });
   } else {
     it.skip("Blowfish not supported in this Node.js version", () => {});
     it.skip("Blowfish not supported in this Node.js version", () => {});

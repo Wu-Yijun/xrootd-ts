@@ -1,19 +1,30 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import {
+  buildAuthRequest,
   buildCloseRequest,
+  buildDirlistRequest,
+  buildEndsessRequest,
   buildHandshakeAndProtocol,
   buildLoginRequest,
+  buildMkdirRequest,
+  buildMvRequest,
   buildOpenRequest,
   buildReadRequest,
+  buildRmdirRequest,
+  buildRmRequest,
   buildStatRequest,
+  buildSyncRequest,
+  buildTruncateRequest,
   buildWriteRequest,
+  parseDirlistResponse,
   parseErrorResponse,
   parseLoginResponse,
   parseOpenResponse,
   parseProtocolResponse,
   parseRedirectResponse,
   parseSecToken,
+  parseSpnPrefix,
   parseWaitResponse,
 } from "./message.ts";
 
@@ -413,5 +424,249 @@ describe("parseWaitResponse", () => {
     const resp = parseWaitResponse(body);
     assert.equal(resp.seconds, 5);
     assert.equal(resp.infomsg, msg);
+  });
+});
+
+// ── Missing Builders ───────────────────────────────────────────────────────
+
+describe("buildSyncRequest", () => {
+  it("produces 24-byte message with requestid=3016", () => {
+    const fhandle = new Uint8Array([0xaa, 0xbb, 0xcc, 0xdd]);
+    const buf = buildSyncRequest(3, fhandle);
+
+    assert.equal(buf.length, 24);
+    assert.equal(buf.readUInt16BE(0), 3); // streamid
+    assert.equal(buf.readUInt16BE(2), 3016); // RequestId.Sync
+    assert.deepEqual([...buf.subarray(4, 8)], [0xaa, 0xbb, 0xcc, 0xdd]); // fhandle
+    // reserved[12] at 8-19 should be zeros
+    for (let i = 8; i < 20; i++) {
+      assert.equal(buf[i], 0);
+    }
+    assert.equal(buf.readUInt32BE(20), 0); // dlen=0
+  });
+});
+
+describe("buildTruncateRequest", () => {
+  it("produces header + 8-byte size in extra data", () => {
+    const fhandle = new Uint8Array([0x01, 0x02, 0x03, 0x04]);
+    const buf = buildTruncateRequest(5, fhandle, 1024);
+
+    assert.equal(buf.readUInt16BE(0), 5); // streamid
+    assert.equal(buf.readUInt16BE(2), 3028); // RequestId.Truncate
+    assert.deepEqual([...buf.subarray(4, 8)], [0x01, 0x02, 0x03, 0x04]); // fhandle
+    assert.equal(buf.readUInt32BE(20), 8); // dlen=8 (size field)
+    // size as int64 BE at offset 24
+    assert.equal(buf.readInt32BE(24), 0); // high
+    assert.equal(buf.readInt32BE(28), 1024); // low
+  });
+
+  it("handles large size > 4GB", () => {
+    const fhandle = new Uint8Array(4);
+    const size = 0x100000000; // 4GB
+    const buf = buildTruncateRequest(0, fhandle, size);
+    assert.equal(buf.readInt32BE(24), 1); // high
+    assert.equal(buf.readInt32BE(28), 0); // low
+  });
+});
+
+describe("buildDirlistRequest", () => {
+  it("contains path in extra data with options at offset 19", () => {
+    const path = "/data/test";
+    const buf = buildDirlistRequest(2, path, 2); // Dstat option
+
+    assert.equal(buf.readUInt16BE(0), 2); // streamid
+    assert.equal(buf.readUInt16BE(2), 3004); // RequestId.Dirlist
+    assert.equal(buf.readUInt8(19), 2); // options = Dstat
+    assert.equal(buf.readUInt32BE(20), Buffer.byteLength(path)); // dlen
+    assert.equal(buf.toString("utf8", 24), path);
+  });
+
+  it("defaults options to 0", () => {
+    const buf = buildDirlistRequest(0, "/test");
+    assert.equal(buf.readUInt8(19), 0);
+  });
+});
+
+describe("buildMkdirRequest", () => {
+  it("contains path with mode at offset 17-18", () => {
+    const path = "/new/dir";
+    const buf = buildMkdirRequest(4, path, 0o755);
+
+    assert.equal(buf.readUInt16BE(0), 4); // streamid
+    assert.equal(buf.readUInt16BE(2), 3008); // RequestId.Mkdir
+    assert.equal(buf.readUInt16BE(17), 0o755); // mode as uint16 BE
+    assert.equal(buf.readUInt32BE(20), Buffer.byteLength(path)); // dlen
+    assert.equal(buf.toString("utf8", 24), path);
+  });
+
+  it("defaults mode to DEFAULT_DIR_MODE (0o755)", () => {
+    const buf = buildMkdirRequest(0, "/test");
+    assert.equal(buf.readUInt16BE(17), 0o755);
+  });
+});
+
+describe("buildRmdirRequest", () => {
+  it("contains path with reserved[16] zeros", () => {
+    const path = "/dir/to/remove";
+    const buf = buildRmdirRequest(6, path);
+
+    assert.equal(buf.readUInt16BE(0), 6); // streamid
+    assert.equal(buf.readUInt16BE(2), 3015); // RequestId.Rmdir
+    for (let i = 4; i < 20; i++) {
+      assert.equal(buf[i], 0); // reserved[16]
+    }
+    assert.equal(buf.readUInt32BE(20), Buffer.byteLength(path));
+    assert.equal(buf.toString("utf8", 24), path);
+  });
+});
+
+describe("buildRmRequest", () => {
+  it("contains path with reserved[16] zeros", () => {
+    const path = "/file/to/delete";
+    const buf = buildRmRequest(7, path);
+
+    assert.equal(buf.readUInt16BE(0), 7); // streamid
+    assert.equal(buf.readUInt16BE(2), 3014); // RequestId.Rm
+    for (let i = 4; i < 20; i++) {
+      assert.equal(buf[i], 0); // reserved[16]
+    }
+    assert.equal(buf.readUInt32BE(20), Buffer.byteLength(path));
+    assert.equal(buf.toString("utf8", 24), path);
+  });
+});
+
+describe("buildMvRequest", () => {
+  it("contains source + space + target in extra data", () => {
+    const source = "/old/path";
+    const target = "/new/path";
+    const buf = buildMvRequest(8, source, target);
+
+    assert.equal(buf.readUInt16BE(0), 8); // streamid
+    assert.equal(buf.readUInt16BE(2), 3009); // RequestId.Mv
+    // arg1len at offset 18-19
+    assert.equal(buf.readUInt16BE(18), Buffer.byteLength(source));
+    // dlen = srcLen + 1 (space) + tgtLen
+    const expectedDlen = Buffer.byteLength(source) + 1 + Buffer.byteLength(target);
+    assert.equal(buf.readUInt32BE(20), expectedDlen);
+    // Extra data: source + " " + target
+    const extra = buf.toString("utf8", 24);
+    assert.equal(extra, source + " " + target);
+  });
+});
+
+describe("buildAuthRequest", () => {
+  it("contains credtype at offset 16-19 and credData in extra", () => {
+    const credData = new Uint8Array([0xaa, 0xbb, 0xcc]);
+    const buf = buildAuthRequest(9, 0, credData); // credType=0 (host)
+
+    assert.equal(buf.readUInt16BE(0), 9); // streamid
+    assert.equal(buf.readUInt16BE(2), 3000); // RequestId.Auth
+    // reserved[12] at 4-15 should be zeros
+    for (let i = 4; i < 16; i++) {
+      assert.equal(buf[i], 0);
+    }
+    // credType at 16-19
+    assert.equal(buf.readUInt32BE(16), 0);
+    assert.equal(buf.readUInt32BE(20), 3); // dlen = credData length
+    assert.deepEqual([...buf.subarray(24, 27)], [0xaa, 0xbb, 0xcc]);
+  });
+});
+
+describe("buildEndsessRequest", () => {
+  it("produces 24-byte message with sessid at offset 4-19", () => {
+    const sessid = new Uint8Array([
+      1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16,
+    ]);
+    const buf = buildEndsessRequest(10, sessid);
+
+    assert.equal(buf.length, 24);
+    assert.equal(buf.readUInt16BE(0), 10); // streamid
+    assert.equal(buf.readUInt16BE(2), 3023); // RequestId.Endsess
+    assert.deepEqual([...buf.subarray(4, 20)], [...sessid]); // sessid[16]
+    assert.equal(buf.readUInt32BE(20), 0); // dlen=0
+  });
+});
+
+// ── Missing Parsers ────────────────────────────────────────────────────────
+
+describe("parseSpnPrefix", () => {
+  it("extracts prefix from secToken with krb5 entry", () => {
+    const token = new TextEncoder().encode(
+      "&P=krb5,host/eos07.ihep.ac.cn@IHEPKRB5&P=unix",
+    );
+    assert.equal(parseSpnPrefix(token, "krb5"), "host");
+  });
+
+  it("extracts xrootd prefix", () => {
+    const token = new TextEncoder().encode(
+      "&P=krb5,xrootd/eos01.ihep.ac.cn@IHEPKRB5&P=unix",
+    );
+    assert.equal(parseSpnPrefix(token, "krb5"), "xrootd");
+  });
+
+  it("returns undefined when no krb5 entry", () => {
+    const token = new TextEncoder().encode("&P=host&P=unix");
+    assert.equal(parseSpnPrefix(token, "krb5"), undefined);
+  });
+
+  it("returns undefined for empty token", () => {
+    const token = new Uint8Array(0);
+    assert.equal(parseSpnPrefix(token, "krb5"), undefined);
+  });
+
+  it("returns undefined when no slash in SPN", () => {
+    const token = new TextEncoder().encode("&P=krb5,noslash");
+    assert.equal(parseSpnPrefix(token, "krb5"), undefined);
+  });
+});
+
+describe("parseDirlistResponse", () => {
+  it("parses name-only format (newline-separated)", () => {
+    const body = Buffer.from("file1\nfile2\nfile3\n");
+    const resp = parseDirlistResponse(body);
+    assert.equal(resp.entries.length, 3);
+    assert.equal(resp.entries[0].name, "file1");
+    assert.equal(resp.entries[1].name, "file2");
+    assert.equal(resp.entries[2].name, "file3");
+  });
+
+  it("parses dstat format with 4-field statinfo", () => {
+    const body = Buffer.from(
+      ".\n0 0 0 0\nfile1.txt\n0 100 0 1700000000\nfile2.txt\n0 200 0 1700000001\n",
+    );
+    const resp = parseDirlistResponse(body);
+    assert.equal(resp.entries.length, 2);
+    assert.equal(resp.entries[0].name, "file1.txt");
+    assert.equal(resp.entries[0].size, 100);
+    assert.equal(resp.entries[0].mtime, 1700000000);
+    assert.equal(resp.entries[1].name, "file2.txt");
+    assert.equal(resp.entries[1].size, 200);
+  });
+
+  it("parses dstat format with 9-field statinfo", () => {
+    const body = Buffer.from(
+      ".\n0 0 0 0\nmyfile\n12345 1024 0 1700000000 1700000001 1700000002 100644 root group\n",
+    );
+    const resp = parseDirlistResponse(body);
+    assert.equal(resp.entries.length, 1);
+    assert.equal(resp.entries[0].name, "myfile");
+    assert.equal(resp.entries[0].size, 1024);
+    assert.equal(resp.entries[0].mtime, 1700000000);
+    assert.equal(resp.entries[0].ctime, 1700000001);
+    assert.equal(resp.entries[0].atime, 1700000002);
+  });
+
+  it("returns empty entries for empty body", () => {
+    const body = Buffer.alloc(0);
+    const resp = parseDirlistResponse(body);
+    assert.equal(resp.entries.length, 0);
+  });
+
+  it("handles NUL-terminated input", () => {
+    const body = Buffer.from("file1\nfile2\0");
+    const resp = parseDirlistResponse(body);
+    assert.equal(resp.entries.length, 2);
+    assert.equal(resp.entries[0].name, "file1");
+    assert.equal(resp.entries[1].name, "file2");
   });
 });

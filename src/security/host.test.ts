@@ -46,4 +46,19 @@ describe("HostAuth", () => {
     assert.equal(entity.uid, 0);
     assert.equal(entity.gid, 0);
   });
+
+  it("credentials contain NUL terminator", async () => {
+    const auth = new HostAuth();
+    const creds = await auth.getCredentials(defaultParams);
+    // "host\0" = [104, 111, 115, 116, 0]
+    assert.equal(creds[4], 0x00);
+    assert.equal(creds.length, 5);
+  });
+
+  it("multiple getCredentials calls are idempotent", async () => {
+    const auth = new HostAuth();
+    const creds1 = await auth.getCredentials(defaultParams);
+    const creds2 = await auth.getCredentials(defaultParams);
+    assert.deepEqual([...creds1], [...creds2]);
+  });
 });

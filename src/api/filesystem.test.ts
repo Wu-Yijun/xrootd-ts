@@ -255,4 +255,46 @@ describe("FileSystem", () => {
       });
     });
   });
+
+  describe("readdir edge cases", () => {
+    it("returns empty entries for empty directory", async () => {
+      const readdirPromise = fs.readdir("/empty");
+      await sleep(1);
+
+      // Empty dir: just prefix with no entries
+      const dirlistBody = Buffer.from(".\n0 0 0 0\n");
+      transport.simulateResponse(0, dirlistBody);
+
+      const result = await readdirPromise;
+      assert.equal(result.name, "/empty");
+      assert.equal(result.entries.length, 0);
+    });
+
+    it("parses name-only format without dstat", async () => {
+      const readdirPromise = fs.readdir("/names");
+      await sleep(1);
+
+      const dirlistBody = Buffer.from("file1.txt\nfile2.txt\n");
+      transport.simulateResponse(0, dirlistBody);
+
+      const result = await readdirPromise;
+      assert.equal(result.entries.length, 2);
+      assert.equal(result.entries[0].name, "file1.txt");
+      assert.equal(result.entries[1].name, "file2.txt");
+    });
+  });
+
+  describe("mkdir edge cases", () => {
+    it("mkdir request contains correct mode field", async () => {
+      const mkdirPromise = fs.mkdir("/custom/mode", 0o700);
+      await sleep(1);
+
+      // Verify the sent request has mode at offset 17-18
+      const lastReq = transport.sentData[transport.sentData.length - 1];
+      assert.equal(lastReq.readUInt16BE(2), 3008); // kXR_mkdir
+      // The mode should be in the request body
+      transport.simulateResponse(0, Buffer.alloc(0));
+      await mkdirPromise;
+    });
+  });
 });

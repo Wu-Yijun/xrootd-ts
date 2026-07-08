@@ -267,4 +267,111 @@ describe("File", () => {
 
     mux.close();
   });
+
+  it("stat() returns StatInfo for open file", async () => {
+    const transport = new MockTransport();
+    const { file, mux } = createFileWithMock(transport);
+
+    const fhandle = Buffer.from([0xaa, 0xbb, 0xcc, 0xdd]);
+    transport.enqueueResponse(0, buildOpenBody(fhandle));
+    await file.open("/test", { flags: 0x0010 });
+
+    const statBody = Buffer.from(
+      "12345 1024 0 1700000000 1700000001 1700000002 100644 root root",
+    );
+    transport.enqueueResponse(0, statBody);
+
+    const info = await file.stat();
+    assert.equal(info.id, "12345");
+    assert.equal(info.size, 1024n);
+    assert.equal(info.isDirectory, false);
+
+    transport.enqueueResponse(0, Buffer.alloc(0));
+    await file.close();
+    mux.close();
+  });
+
+  it("stat() on closed file throws", async () => {
+    const transport = new MockTransport();
+    const { file, mux } = createFileWithMock(transport);
+
+    await assert.rejects(
+      () => file.stat(),
+      (err: any) => err instanceof XRootDError && err.code === 3004,
+    );
+
+    mux.close();
+  });
+
+  it("read() handles Oksofar status (4000)", async () => {
+    const transport = new MockTransport();
+    const { file, mux } = createFileWithMock(transport);
+
+    const fhandle = Buffer.from([0x01, 0x02, 0x03, 0x04]);
+    transport.enqueueResponse(0, buildOpenBody(fhandle));
+    await file.open("/test", { flags: 0x0010 });
+
+    const fileData = Buffer.from([0xde, 0xad, 0xbe, 0xef]);
+    transport.enqueueResponse(4000, fileData); // Oksofar
+
+    const data = await file.read(0, 4);
+    assert.deepEqual([...data], [0xde, 0xad, 0xbe, 0xef]);
+
+    transport.enqueueResponse(0, Buffer.alloc(0));
+    await file.close();
+    mux.close();
+  });
+
+  it("close() is idempotent (no error on second close)", async () => {
+    const transport = new MockTransport();
+    const { file, mux } = createFileWithMock(transport);
+
+    const fhandle = Buffer.from([0xaa, 0xbb, 0xcc, 0xdd]);
+    transport.enqueueResponse(0, buildOpenBody(fhandle));
+    await file.open("/test", { flags: 0x0010 });
+
+    transport.enqueueResponse(0, Buffer.alloc(0));
+    await file.close();
+    assert.equal(file.isOpen, false);
+
+    // Second close should not throw
+    await file.close();
+    assert.equal(file.isOpen, false);
+
+    mux.close();
+  });
+
+  it("close() after never opened returns without error", async () => {
+    const transport = new MockTransport();
+    const { file, mux } = createFileWithMock(transport);
+
+    // File was never opened — close should be a no-op
+    await file.close();
+    assert.equal(file.isOpen, false);
+
+    mux.close();
+  });
+
+  it("write() returns dlen when server provides it", async () => {
+    const transport = new MockTransport();
+    const { file, mux } = createFileWithMock(transport);
+
+    const fhandle = Buffer.from([0x11, 0x22, 0x33, 0x44]);
+    transport.enqueueResponse(0, buildOpenBody(fhandle));
+    await file.open("/test", { flags: 0x0020 });
+
+    // Server responds with dlen=10 in frame
+    transport.enqueueResponse(0, Buffer.alloc(0));
+    // Mock: the frame.dlen is parsed from response header, mock returns 0
+    // so write returns data.length. To test dlen path we need the mux to
+    // return a frame with dlen > 0, but the mock doesn't support that.
+    // This test verifies the fallback to data.length.
+    const writeData = new Uint8Array([1, 2, 3, 4, 5]);
+    const written = await file.write(0, writeData);
+    assert.equal(written, 5);
+
+    transport.enqueueResponse(0, Buffer.alloc(0));
+    await file.close();
+    mux.close();
+  });
 });

@@ -343,4 +343,66 @@ describe("Multiplexer", () => {
       redirectMux.close();
     });
   });
+
+  describe("kXR_attn handling", () => {
+    it("handles kXR_attn with actnum=5008 (async response)", async () => {
+      mux.setTimeout(10000);
+      const body = new Uint8Array(16);
+      const responsePromise = mux.request(3006, body);
+
+      await sleep(1);
+
+      // Build attn response: action[4] + extra[12]
+      // action=5008 means embedded response follows
+      const attnBody = Buffer.alloc(16);
+      attnBody.writeUInt32BE(5008, 0); // actnum = AsyncResp
+
+      transport.simulateResponse(4001, attnBody);
+
+      // After attn, the mux should expect the embedded response
+      await sleep(10);
+
+      // Simulate the embedded response for the original request
+      const lastReq = transport.sentData[transport.sentData.length - 1];
+      const retrySid = extractStreamId(lastReq);
+      transport.simulateResponseFor(retrySid, 0, Buffer.alloc(0));
+
+      const frame = await responsePromise;
+      assert.equal(frame.status, 0);
+    });
+  });
+
+  describe("getTransport", () => {
+    it("returns the transport instance", () => {
+      const t = mux.getTransport();
+      assert.equal(t, transport);
+    });
+  });
+
+  describe("updateRedirectHandler", () => {
+    it("replaces the redirect handler", async () => {
+      let newHandlerCalled = false;
+      mux.updateRedirectHandler(async (_host, _port, pending) => {
+        newHandlerCalled = true;
+        pending.resolve({ streamId: 0, status: 0, dlen: 0, body: Buffer.alloc(0) });
+      });
+
+      const body = new Uint8Array(16);
+      const promise = mux.request(3006, body);
+
+      await sleep(1);
+
+      const host = "server";
+      const redirectBody = Buffer.alloc(4 + host.length + 1);
+      redirectBody.writeInt32BE(1094, 0);
+      redirectBody.write(host, 4, "utf8");
+
+      transport.simulateResponse(4004, redirectBody);
+      await sleep(50);
+
+      assert.equal(newHandlerCalled, true);
+
+      mux.close();
+    });
+  });
 });

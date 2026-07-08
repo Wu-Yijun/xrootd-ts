@@ -234,4 +234,131 @@ describe("Auth Framework", () => {
 
     await assert.rejects(responsePromise, (err: any) => err.code === 3030);
   });
+
+  it("protocolFilter restricts which protocols are tried", async () => {
+    registerAuthProtocol(
+      "host",
+      () => new MockAuthProtocol(new Uint8Array([0xaa])),
+    );
+
+    const params: AuthParams = {
+      host: "localhost",
+      port: 1094,
+      username: "test",
+      sessid: new Uint8Array(16),
+    };
+
+    // Filter allows only "host", server requires ["host", "sss"]
+    const responsePromise = doAuthentication(
+      mux,
+      ["host", "sss"],
+      params,
+      { protocolFilter: ["host"] },
+    );
+
+    await sleep(1);
+    transport.simulateResponse(0, Buffer.alloc(0));
+
+    const entity = await responsePromise;
+    assert.equal(entity.prot, "host");
+  });
+
+  it("protocolFilter with no match throws", async () => {
+    const params: AuthParams = {
+      host: "localhost",
+      port: 1094,
+      username: "test",
+      sessid: new Uint8Array(16),
+    };
+
+    // Filter allows only "krb5", but server requires ["host"] and krb5 not registered
+    await assert.rejects(
+      () =>
+        doAuthentication(mux, ["host"], params, {
+          protocolFilter: ["krb5"],
+        }),
+      (err: any) => err.code === 3030,
+    );
+  });
+
+  it("multi-protocol fallback: skip unsupported, try supported", async () => {
+    registerAuthProtocol(
+      "host",
+      () => new MockAuthProtocol(new Uint8Array([0xbb])),
+    );
+
+    const params: AuthParams = {
+      host: "localhost",
+      port: 1094,
+      username: "test",
+      sessid: new Uint8Array(16),
+    };
+
+    // Server requires ["krb5", "host"], only "host" is registered
+    const responsePromise = doAuthentication(mux, ["krb5", "host"], params);
+
+    await sleep(1);
+    transport.simulateResponse(0, Buffer.alloc(0));
+
+    const entity = await responsePromise;
+    assert.equal(entity.prot, "host");
+  });
+
+  it("all protocols fail throws with all attempted names", async () => {
+    registerAuthProtocol(
+      "host",
+      () => new MockAuthProtocol(new Uint8Array([0x01])),
+    );
+    registerAuthProtocol(
+      "sss",
+      () => new MockAuthProtocol(new Uint8Array([0x02]), { prot: "sss" }),
+    );
+
+    const params: AuthParams = {
+      host: "localhost",
+      port: 1094,
+      username: "test",
+      sessid: new Uint8Array(16),
+    };
+
+    const responsePromise = doAuthentication(mux, ["host", "sss"], params);
+
+    // Both will fail with error
+    await sleep(1);
+    transport.simulateResponse(4003, Buffer.alloc(4)); // error for host
+    await sleep(1);
+    transport.simulateResponse(4003, Buffer.alloc(4)); // error for sss
+
+    await assert.rejects(
+      responsePromise,
+      (err: any) => err.code === 3030,
+    );
+  });
+
+  it("registerAuthProtocol overwrites previous factory", async () => {
+    let callCount = 0;
+    registerAuthProtocol("host", () => {
+      callCount++;
+      return new MockAuthProtocol(new Uint8Array([0x01]));
+    });
+    registerAuthProtocol("host", () => {
+      callCount++;
+      return new MockAuthProtocol(new Uint8Array([0x02]));
+    });
+
+    const params: AuthParams = {
+      host: "localhost",
+      port: 1094,
+      username: "test",
+      sessid: new Uint8Array(16),
+    };
+
+    const responsePromise = doAuthentication(mux, ["host"], params);
+    await sleep(1);
+    transport.simulateResponse(0, Buffer.alloc(0));
+    await responsePromise;
+
+    // Second factory was registered, so callCount should be 1 (only second factory called)
+    assert.equal(callCount, 1);
+  });
 });
