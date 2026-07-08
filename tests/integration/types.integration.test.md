@@ -8,7 +8,7 @@ Validates that the TypeScript types and constants used across the library are co
 
 ## Integration: StatInfo type validation
 
-### 1. stat returns StatInfo with correct types for all fields
+### 1. stat returns StatInfo with correct types for all fields — ✅ 保留
 
 Connects to the server, calls `client.stat(TEST_FILE_PATH)`, and asserts the runtime type of every field:
 - `id`: string
@@ -27,19 +27,19 @@ Connects to the server, calls `client.stat(TEST_FILE_PATH)`, and asserts the run
 
 **Operation:** Validates that the stat response parser correctly maps XRootD's text-based stat format to typed TypeScript fields.
 
-### 2. stat on directory sets isDirectory = true
+### 2. stat on directory sets isDirectory = true — ✅ 保留
 
 Calls `client.statFilesystem("/data/test")` and asserts `info.isDirectory === true`.
 
 **Edge case:** Directory detection via the mode bits in the stat response.
 
-### 3. stat on file sets isDirectory = false
+### 3. stat on file sets isDirectory = false — ✅ 保留
 
 Calls `client.stat(TEST_FILE_PATH)` and asserts `info.isDirectory === false`.
 
 **Edge case:** Regular file detection.
 
-### 4. createStatInfo parser returns correct types
+### 4. createStatInfo parser returns correct types — ✅ 保留
 
 Calls `createStatInfo()` with a manually constructed stat string `"12345 6789 3 1700000000 1700000100 1700000200 100644 root group"` and asserts:
 - `id === "12345"` (string)
@@ -51,13 +51,13 @@ Calls `createStatInfo()` with a manually constructed stat string `"12345 6789 3 
 
 **Operation:** Unit-level validation of the stat string parser without a live server.
 
-### 5. createStatInfo detects directory from mode
+### 5. createStatInfo detects directory from mode — ✅ 保留
 
 Parses stat string with mode `040755` (directory) and asserts `isDirectory === true`.
 
 **Edge case:** Mode `0o040000` set in the mode field indicates a directory.
 
-### 6. createStatInfo detects symlink from mode
+### 6. createStatInfo detects symlink from mode — ✅ 保留
 
 Parses stat string with mode `120777` (symlink) and asserts `isLink === true`.
 
@@ -67,7 +67,7 @@ Parses stat string with mode `120777` (symlink) and asserts `isLink === true`.
 
 ## Integration: DirectoryEntry type validation
 
-### 7. readdir entries have correct types
+### 7. readdir entries have correct types — ✅ 保留
 
 Connects, calls `client.readdir("/data/test")`, iterates over entries, and asserts each entry has:
 - `name`: string (non-empty)
@@ -77,7 +77,7 @@ Connects, calls `client.readdir("/data/test")`, iterates over entries, and asser
 
 **Operation:** Validates directory listing entry types from a live server.
 
-### 8. readdir name matches requested path
+### 8. readdir name matches requested path — ✅ 保留
 
 Asserts `list.name === "/data/test"` — the returned list name matches the requested path.
 
@@ -87,13 +87,13 @@ Asserts `list.name === "/data/test"` — the returned list name matches the requ
 
 ## Integration: OpenFlags constants
 
-### 9. OpenFlags enum values are correct
+### 9. OpenFlags enum values are correct — ✅ 保留
 
 Asserts all 16 `OpenFlags` enum values match their expected hex values (Compress=0x0001 through Wrto=0x8000).
 
 **Operation:** Static constant validation — ensures the enum hasn't been accidentally modified.
 
-### 10. OpenFlags can be combined with bitwise OR
+### 10. OpenFlags can be combined with bitwise OR — ✅ 保留
 
 Asserts `OpenFlags.Write | OpenFlags.New === 0x0028`.
 
@@ -103,7 +103,7 @@ Asserts `OpenFlags.Write | OpenFlags.New === 0x0028`.
 
 ## Integration: StatFlags constants
 
-### 11. StatFlags enum values are correct
+### 11. StatFlags enum values are correct — ✅ 保留
 
 Asserts all `StatFlags` values: XBitSet=1, IsDir=2, Other=4, Offline=8, Readable=16, Writable=32, POSCPending=64, BackUpExists=128, CacheResp=512.
 
@@ -113,7 +113,7 @@ Asserts all `StatFlags` values: XBitSet=1, IsDir=2, Other=4, Offline=8, Readable
 
 ## Integration: DirlistOptions constants
 
-### 12. DirlistOptions values are correct
+### 12. DirlistOptions values are correct — ✅ 保留
 
 Asserts: Online=1, Dstat=2, Dcksm=4, Dstatx=8.
 
@@ -123,25 +123,25 @@ Asserts: Online=1, Dstat=2, Dcksm=4, Dstatx=8.
 
 ## Integration: XRootDError class
 
-### 13. codeToMessage returns correct messages for known codes
+### 13. codeToMessage returns correct messages for known codes — ✅ 保留
 
 Asserts `codeToMessage()` for: NotFound → "File not found", NotAuthorized → "Not authorized", ItExists → "File already exists", IsDirectory → "Is a directory", Timeout → "Timeout", Disconnected → "Disconnected".
 
 **Operation:** Error code to message mapping.
 
-### 14. codeToMessage returns fallback for unknown codes
+### 14. codeToMessage returns fallback for unknown codes — ✅ 保留
 
 Asserts `codeToMessage(9999)` contains `"9999"`.
 
 **Edge case:** Unknown codes produce a generic message with the code number.
 
-### 15. error instances have correct name and code
+### 15. error instances have correct name and code — ✅ 保留
 
 Constructs `new XRootDError(3011, "custom message")` and asserts `name`, `code`, `message`, and `errno === undefined`.
 
 **Operation:** Error object construction.
 
-### 16. error with errno preserves it
+### 16. error with errno preserves it — ✅ 保留
 
 Constructs `new XRootDError(3007, "io error", 5)` and asserts `errno === 5`.
 
@@ -151,7 +151,7 @@ Constructs `new XRootDError(3007, "io error", 5)` and asserts `errno === 5`.
 
 ## Integration: XRootDUrl class
 
-### 17–24. URL parsing and utility methods
+### 17–24. URL parsing and utility methods — ✅ 保留
 
 Tests `XRootDUrl` parsing of various URL formats (full, secure, default port, with credentials), `getChannelId()`, `getLocation()`, `toString()`, `isValid()`, and static `parse()`.
 
@@ -161,8 +161,32 @@ Tests `XRootDUrl` parsing of various URL formats (full, secure, default port, wi
 
 ## Integration: Protocol constants
 
-### 25–28. Protocol version, default port, POSIX modes, credential types
+### 25–28. Protocol version, default port, POSIX modes, credential types — ✅ 保留
 
 Asserts `PROTOCOL_VERSION === 0x520`, `DEFAULT_PORT === 1094`, `S_IFDIR === 0o040000`, `S_IFLNK === 0o120000`, and `CRED_TYPE` maps for host/sss/unix/krb5/gsi.
 
 **Operation:** Core protocol constant validation.
+
+---
+
+## 需要补充的测试
+
+### IT-1. stat 空文件 — 🟡 需要添加
+
+创建一个空文件（0 字节），stat 验证 `size === 0n`。
+
+### IT-2. stat 大文件 — 🟡 需要添加
+
+创建大于 4GB 的文件，验证 `size` bigint 值正确。
+
+### IT-3. readdir 空目录 — 🟡 需要添加
+
+readdir 一个空目录，验证 `entries` 为空数组。
+
+### IT-4. codeToMessage 更多错误码 — 🟡 需要添加
+
+验证 FileLocked (3003), IOError (3007), Unsupported (3013), DirNotEmpty (3015) 等错误码的消息映射。
+
+### IT-5. XRootDError 序列化 — 🟡 可选
+
+验证 XRootDError 可以正确序列化/反序列化（如 `JSON.stringify`）。
