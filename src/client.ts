@@ -12,6 +12,14 @@ import { XRootDError } from "./api/errors.ts";
 import { ClientError, OpenFlags } from "./protocol/constants.ts";
 import type { SecEnv } from "./config/sec-env.ts";
 
+const leakDetector = new FinalizationRegistry((leakInfo: { location: string }) => {
+  console.warn(
+    `[XRootD Warning] Resource Leak Detected: An XRootDClient for '${leakInfo.location}' ` +
+      `was garbage collected without being closed. This will cause TCP socket leaks. ` +
+      `Please ensure you call client.close() or use 'await using client = ...'.`,
+  );
+});
+
 export interface XRootDClientOptions {
   credentials?: {
     username: string;
@@ -26,6 +34,18 @@ export interface XRootDClientOptions {
   };
   /** Security environment configuration. Enables credential auto-discovery and protocol filtering. */
   secEnv?: SecEnv;
+  /**
+   * Whether to call socket.unref() so the connection doesn't keep the process alive.
+   * @default false
+   */
+  unrefSockets?: boolean;
+  /**
+   * Idle timeout in milliseconds for the main control connection.
+   * Socket is destroyed after this period of no data flow. Set to 0 to disable.
+   * Note: File connections use this value as the default, but can be overridden per-file.
+   * @default 30000
+   */
+  idleTimeout?: number;
 }
 
 export class XRootDClient {
@@ -54,6 +74,8 @@ export class XRootDClient {
       redirectCount: this.redirectCount,
       tls: this.options.tls,
       secEnv: this.options.secEnv,
+      unrefSockets: this.options.unrefSockets,
+      idleTimeout: this.options.idleTimeout,
       onRedirect: (host, port, pending) =>
         this.handleRedirect(host, port, pending),
     });
@@ -71,6 +93,8 @@ export class XRootDClient {
       }
       return this.mux;
     });
+
+    leakDetector.register(this, { location: this.url.getLocation() });
   }
 
   private async handleRedirect(
@@ -133,9 +157,9 @@ export class XRootDClient {
 
   async open(
     path: string,
-    options?: { flags?: number; mode?: number },
+    options?: { flags?: number; mode?: number; idleTimeout?: number },
   ): Promise<File> {
-    this.ensureConnected();
+    await this.ensureConnectedAsync();
 
     const file = new File({
       url: this.url,
@@ -144,13 +168,15 @@ export class XRootDClient {
       secEnv: this.options.secEnv,
       timeout: this.options.timeout,
       maxRedirects: this.options.maxRedirects,
+      unrefSockets: this.options.unrefSockets,
+      idleTimeout: options?.idleTimeout ?? this.options.idleTimeout,
     });
     await file.open(path, options);
     return file;
   }
 
   async stat(path: string): Promise<StatInfo> {
-    this.ensureConnected();
+    await this.ensureConnectedAsync();
 
     const file = new File({
       url: this.url,
@@ -159,6 +185,8 @@ export class XRootDClient {
       secEnv: this.options.secEnv,
       timeout: this.options.timeout,
       maxRedirects: this.options.maxRedirects,
+      unrefSockets: this.options.unrefSockets,
+      idleTimeout: this.options.idleTimeout,
     });
     await file.open(path, { flags: OpenFlags.Read });
     try {
@@ -169,33 +197,41 @@ export class XRootDClient {
   }
 
   async statFilesystem(path: string): Promise<StatInfo> {
-    return this.ensureFileSystem().stat(path);
+    const fs = await this.ensureFileSystemAsync();
+    return fs.stat(path);
   }
 
   async readdir(
     path: string,
     options?: { dstat?: boolean },
   ): Promise<DirectoryList> {
-    return this.ensureFileSystem().readdir(path, options);
+    const fs = await this.ensureFileSystemAsync();
+    return fs.readdir(path, options);
   }
 
   async mkdir(path: string, mode?: number): Promise<void> {
-    return this.ensureFileSystem().mkdir(path, mode);
+    const fs = await this.ensureFileSystemAsync();
+    return fs.mkdir(path, mode);
   }
 
   async rmdir(path: string): Promise<void> {
-    return this.ensureFileSystem().rmdir(path);
+    const fs = await this.ensureFileSystemAsync();
+    return fs.rmdir(path);
   }
 
   async rm(path: string): Promise<void> {
-    return this.ensureFileSystem().rm(path);
+    const fs = await this.ensureFileSystemAsync();
+    return fs.rm(path);
   }
 
   async mv(source: string, target: string): Promise<void> {
-    return this.ensureFileSystem().mv(source, target);
+    const fs = await this.ensureFileSystemAsync();
+    return fs.mv(source, target);
   }
 
   async close(): Promise<void> {
+    leakDetector.unregister(this);
+
     if (this.mux) {
       this.mux.close();
       this.mux = null;
@@ -210,6 +246,10 @@ export class XRootDClient {
     this.fs = null;
   }
 
+  async [Symbol.asyncDispose]() {
+    await this.close();
+  }
+
   get isConnected(): boolean {
     return this.session !== null;
   }
@@ -218,14 +258,25 @@ export class XRootDClient {
     return this.url.getLocation();
   }
 
-  private ensureConnected(): Multiplexer {
-    if (!this.mux || !this.session) {
-      throw new XRootDError(ClientError.Uninitialized, "Client not connected");
+  private async ensureConnectedAsync(): Promise<Multiplexer> {
+    if (this.mux && !this.mux.isClosed) {
+      return this.mux;
+    }
+
+    console.debug("[XRootDClient] Main connection lost. Reconnecting...");
+    await this.doConnect(this.url);
+
+    if (!this.mux) {
+      throw new XRootDError(
+        ClientError.InternalError,
+        "Failed to reconnect",
+      );
     }
     return this.mux;
   }
 
-  private ensureFileSystem(): FileSystem {
+  private async ensureFileSystemAsync(): Promise<FileSystem> {
+    await this.ensureConnectedAsync();
     if (!this.fs) {
       throw new XRootDError(ClientError.Uninitialized, "Client not connected");
     }
