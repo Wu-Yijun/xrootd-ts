@@ -488,20 +488,20 @@ describe("buildDirlistRequest", () => {
 });
 
 describe("buildMkdirRequest", () => {
-  it("contains path with mode at offset 17-18", () => {
+  it("contains path with mode at offset 18-19", () => {
     const path = "/new/dir";
     const buf = buildMkdirRequest(4, path, 0o755);
 
     assert.equal(buf.readUInt16BE(0), 4); // streamid
     assert.equal(buf.readUInt16BE(2), 3008); // RequestId.Mkdir
-    assert.equal(buf.readUInt16BE(17), 0o755); // mode as uint16 BE
+    assert.equal(buf.readUInt16BE(18), 0o755); // mode as uint16 BE
     assert.equal(buf.readUInt32BE(20), Buffer.byteLength(path)); // dlen
     assert.equal(buf.toString("utf8", 24), path);
   });
 
   it("defaults mode to DEFAULT_DIR_MODE (0o755)", () => {
     const buf = buildMkdirRequest(0, "/test");
-    assert.equal(buf.readUInt16BE(17), 0o755);
+    assert.equal(buf.readUInt16BE(18), 0o755);
   });
 });
 
