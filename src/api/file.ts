@@ -169,26 +169,35 @@ export class File {
   }
 
   async read(offset: number, size: number): Promise<Uint8Array> {
+    if (this.isClosed) {
+      throw new XRootDError(ServerError.FileNotOpen, "File is closed");
+    }
+
     if (!this._isOpen || !this.fhandle) {
       throw new XRootDError(ServerError.FileNotOpen, "File is not open");
     }
 
-    const buf = buildReadRequest(0, this.fhandle, offset, size);
-    const frame = await sendRequest(this.mux!, buf);
+    this.pendingOperations++;
+    try {
+      const buf = buildReadRequest(0, this.fhandle, offset, size);
+      const frame = await sendRequest(this.mux!, buf);
 
-    assertOkFrame(frame);
+      assertOkFrame(frame);
 
-    if (
-      frame.status === ResponseStatus.Ok ||
-      frame.status === ResponseStatus.Oksofar
-    ) {
-      return new Uint8Array(frame.body);
+      if (
+        frame.status === ResponseStatus.Ok ||
+        frame.status === ResponseStatus.Oksofar
+      ) {
+        return new Uint8Array(frame.body);
+      }
+
+      throw new XRootDError(
+        ServerError.ServerError,
+        `Unexpected read response status: ${frame.status}`,
+      );
+    } finally {
+      this.pendingOperations--;
     }
-
-    throw new XRootDError(
-      ServerError.ServerError,
-      `Unexpected read response status: ${frame.status}`,
-    );
   }
 
   async write(offset: number, data: Uint8Array): Promise<number> {
