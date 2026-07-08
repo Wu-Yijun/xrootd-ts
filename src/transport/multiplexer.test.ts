@@ -310,6 +310,11 @@ describe("Multiplexer", () => {
       const redirectMux = new Multiplexer(transport, {
         maxRedirects: 2,
         redirectCount: 1,
+        onRedirect: async (_host, _port, pending) => {
+          redirectMux.request(pending.requestId, pending.body, pending.data)
+            .then(pending.resolve)
+            .catch(pending.reject);
+        },
       });
 
       assert.equal(redirectMux.getRedirectCount(), 1);

@@ -16,21 +16,31 @@
 
 **问题类型**: 测试文件断言错误
 
-**问题描述**: 测试将 `frame.streamId` 与数字进行 `strictEqual` 比较，但 `Frame.streamId` 类型是 `Buffer`（2 字节 Uint8Array），不是 `number`。
+**问题描述**: 测试将 `frame.streamId`（Buffer 类型）与数字进行 `strictEqual` 比较。
 
-**源码分析** (`src/transport/framer.ts:30-31`):
+**修复方案**: 使用 `readUInt16BE(0)` 从 Buffer 中读取数值。
+
+**状态**: 已修复 (commit 93bd477)
+
+---
+
+## 3. src/transport/multiplexer.test.ts:309-344 - redirectCount 初始化测试缺少 onRedirect
+
+**问题类型**: 测试文件遗漏步骤
+
+**问题描述**: 测试 `redirectCount can be initialized from options` 创建 Multiplexer 时传入 `redirectCount: 1` 但未提供 `onRedirect` 处理函数。当收到 redirect 响应 (4004) 时，源码调用 `handleRedirectResponse` 检查 `onRedirect` 是否存在，不存在则 reject 错误。
+
+**源码分析** (`src/transport/multiplexer.ts:270-276`):
 ```typescript
-frames.push({
-  streamId: this.pending.subarray(0, 2),  // Buffer/Uint8Array
-  ...
-});
+} else {
+  pending.reject(
+    new Error(`Redirect to ${host}:${port} but no onRedirect handler configured`),
+  );
+}
 ```
 
-**错误信息**:
-- `Buffer(2) [0, 0] !== 0`
-- `Buffer(2) [255, 255] !== 65535`
-- `Buffer(2) [0, 42] !== 42`
+**错误行为分析**: 这是测试遗漏，不是源码 bug。源码明确要求 redirect 必须提供 `onRedirect` 处理器。测试只验证了 redirectCount 初始化（第 315 行 `assert.equal(redirectMux.getRedirectCount(), 1)` 是通过的），但后续测试 redirect 重试流程时未提供必要依赖。
 
-**修复方案**: 使用 `readUInt16BE(0)` 从 Buffer 中读取数值，或使用 `deepEqual` 比较字节数组。
+**修复方案**: 在 Multiplexer 构造选项中添加 `onRedirect` mock 函数。
 
 **状态**: 待修复
