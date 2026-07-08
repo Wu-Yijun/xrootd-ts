@@ -45,6 +45,10 @@ export interface ConnectOptions {
   redirectCount?: number;
   tls?: { rejectUnauthorized?: boolean };
   secEnv?: SecEnv;
+  /** Whether to call socket.unref() so the connection doesn't keep the process alive. @default false */
+  unrefSockets?: boolean;
+  /** Idle timeout in milliseconds. Set to 0 to disable. @default 30000 */
+  idleTimeout?: number;
   onRedirect?: (
     host: string,
     port: number,
@@ -74,7 +78,10 @@ export async function connectToHost(
     secEnv: options.secEnv,
   });
 
-  const transport = new Transport();
+  const transport = new Transport({
+    unrefSockets: options.unrefSockets,
+    idleTimeout: options.idleTimeout,
+  });
   await transport.connect(
     url.host,
     url.port,
