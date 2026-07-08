@@ -156,7 +156,7 @@ describe("E2E: redirect auto-handling", () => {
     const serverA = await createRedirectServer("127.0.0.1", serverB.port, 3007);
 
     try {
-      const transport = new Transport();
+      let transport = new Transport();
       await transport.connect("127.0.0.1", serverA.port);
       let mux = new Multiplexer(transport, {
         maxRedirects: 3,
@@ -164,9 +164,9 @@ describe("E2E: redirect auto-handling", () => {
           mux.close();
           await transport.close();
 
-          const t2 = new Transport();
-          await t2.connect(host, port);
-          mux = new Multiplexer(t2, { maxRedirects: 3 });
+          transport = new Transport();
+          await transport.connect(host, port);
+          mux = new Multiplexer(transport, { maxRedirects: 3 });
 
           assert.equal(host, "127.0.0.1");
           assert.equal(port, serverB.port);
