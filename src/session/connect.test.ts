@@ -46,10 +46,21 @@ function makeLoginResponseFrame(secToken?: string): Buffer {
 
 function handleHandshakeOnly(socket: net.Socket): void {
   let buffer = Buffer.alloc(0);
+  let handshakeBytesRemaining = 20;
   socket.write(makeServerInitFrame());
 
   socket.on("data", (chunk: Buffer) => {
     buffer = Buffer.concat([buffer, chunk]);
+
+    if (handshakeBytesRemaining > 0) {
+      if (buffer.length <= handshakeBytesRemaining) {
+        handshakeBytesRemaining -= buffer.length;
+        buffer = Buffer.alloc(0);
+        return;
+      }
+      buffer = buffer.subarray(handshakeBytesRemaining);
+      handshakeBytesRemaining = 0;
+    }
 
     while (buffer.length >= 24) {
       const requestId = buffer.readUInt16BE(2);
@@ -73,8 +84,12 @@ function handleHandshakeOnly(socket: net.Socket): void {
 }
 
 describe("connectToHost", () => {
-  it.skip("establishes connection and returns session", async () => {
-    const server = net.createServer((socket) => handleHandshakeOnly(socket));
+  it("establishes connection and returns session", async () => {
+    const sockets: net.Socket[] = [];
+    const server = net.createServer((socket) => {
+      sockets.push(socket);
+      handleHandshakeOnly(socket);
+    });
     await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
     const addr = server.address() as net.AddressInfo;
 
@@ -92,12 +107,17 @@ describe("connectToHost", () => {
       result.mux.close();
       await result.transport.close();
     } finally {
+      for (const s of sockets) s.destroy();
       server.close();
     }
   });
 
-  it.skip("default port is 1095 when not specified", async () => {
-    const server = net.createServer((socket) => handleHandshakeOnly(socket));
+  it("default port is 1095 when not specified", async () => {
+    const sockets: net.Socket[] = [];
+    const server = net.createServer((socket) => {
+      sockets.push(socket);
+      handleHandshakeOnly(socket);
+    });
     await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
     const addr = server.address() as net.AddressInfo;
 
@@ -109,19 +129,33 @@ describe("connectToHost", () => {
       result.mux.close();
       await result.transport.close();
     } finally {
+      for (const s of sockets) s.destroy();
       server.close();
     }
   });
 
-  it.skip("passes username to handshake", async () => {
+  it("passes username to handshake", async () => {
     let receivedLoginPayload: Buffer | null = null as Buffer | null;
+    const sockets: net.Socket[] = [];
 
     const server = net.createServer((socket) => {
+      sockets.push(socket);
       let buffer = Buffer.alloc(0);
+      let handshakeBytesRemaining = 20;
       socket.write(makeServerInitFrame());
 
       socket.on("data", (chunk: Buffer) => {
         buffer = Buffer.concat([buffer, chunk]);
+
+        if (handshakeBytesRemaining > 0) {
+          if (buffer.length <= handshakeBytesRemaining) {
+            handshakeBytesRemaining -= buffer.length;
+            buffer = Buffer.alloc(0);
+            return;
+          }
+          buffer = buffer.subarray(handshakeBytesRemaining);
+          handshakeBytesRemaining = 0;
+        }
 
         while (buffer.length >= 24) {
           const requestId = buffer.readUInt16BE(2);
@@ -141,7 +175,7 @@ describe("connectToHost", () => {
             body.writeUInt32BE(0x09, 4);
             socket.write(buildResponseFrame(streamId, 0, body));
           } else if (requestId === 3007) {
-            receivedLoginPayload = Buffer.from(message.subarray(24));
+            receivedLoginPayload = Buffer.from(message.subarray(8, 16));
             const body = Buffer.alloc(16);
             for (let i = 0; i < 16; i++) body[i] = i + 1;
             socket.write(buildResponseFrame(streamId, 0, body));
@@ -169,17 +203,31 @@ describe("connectToHost", () => {
       result.mux.close();
       await result.transport.close();
     } finally {
+      for (const s of sockets) s.destroy();
       server.close();
     }
   });
 
-  it.skip("throws on handshake failure and cleans up", async () => {
+  it("throws on handshake failure and cleans up", async () => {
+    const sockets: net.Socket[] = [];
     const server = net.createServer((socket) => {
+      sockets.push(socket);
       let buffer = Buffer.alloc(0);
+      let handshakeBytesRemaining = 20;
       socket.write(makeServerInitFrame());
 
       socket.on("data", (chunk: Buffer) => {
         buffer = Buffer.concat([buffer, chunk]);
+
+        if (handshakeBytesRemaining > 0) {
+          if (buffer.length <= handshakeBytesRemaining) {
+            handshakeBytesRemaining -= buffer.length;
+            buffer = Buffer.alloc(0);
+            return;
+          }
+          buffer = buffer.subarray(handshakeBytesRemaining);
+          handshakeBytesRemaining = 0;
+        }
 
         while (buffer.length >= 24) {
           const requestId = buffer.readUInt16BE(2);
@@ -213,12 +261,17 @@ describe("connectToHost", () => {
         return true;
       });
     } finally {
+      for (const s of sockets) s.destroy();
       server.close();
     }
   });
 
-  it.skip("returns session.needsAuth=false when no secToken", async () => {
-    const server = net.createServer((socket) => handleHandshakeOnly(socket));
+  it("returns session.needsAuth=false when no secToken", async () => {
+    const sockets: net.Socket[] = [];
+    const server = net.createServer((socket) => {
+      sockets.push(socket);
+      handleHandshakeOnly(socket);
+    });
     await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
     const addr = server.address() as net.AddressInfo;
 
@@ -232,17 +285,31 @@ describe("connectToHost", () => {
       result.mux.close();
       await result.transport.close();
     } finally {
+      for (const s of sockets) s.destroy();
       server.close();
     }
   });
 
-  it.skip("returns session.needsAuth=true when secToken contains &P=", async () => {
+  it("returns session.needsAuth=true when secToken contains &P=", async () => {
+    const sockets: net.Socket[] = [];
     const server = net.createServer((socket) => {
+      sockets.push(socket);
       let buffer = Buffer.alloc(0);
+      let handshakeBytesRemaining = 20;
       socket.write(makeServerInitFrame());
 
       socket.on("data", (chunk: Buffer) => {
         buffer = Buffer.concat([buffer, chunk]);
+
+        if (handshakeBytesRemaining > 0) {
+          if (buffer.length <= handshakeBytesRemaining) {
+            handshakeBytesRemaining -= buffer.length;
+            buffer = Buffer.alloc(0);
+            return;
+          }
+          buffer = buffer.subarray(handshakeBytesRemaining);
+          handshakeBytesRemaining = 0;
+        }
 
         while (buffer.length >= 24) {
           const requestId = buffer.readUInt16BE(2);
@@ -262,12 +329,14 @@ describe("connectToHost", () => {
             body.writeUInt32BE(0x09, 4);
             socket.write(buildResponseFrame(streamId, 0, body));
           } else if (requestId === 3007) {
-            const secToken = "&P=host,unix";
+            const secToken = "&P=host&P=unix";
             const tokenBytes = Buffer.from(secToken, "utf8");
             const body = Buffer.alloc(16 + tokenBytes.length);
             for (let i = 0; i < 16; i++) body[i] = i + 1;
             tokenBytes.copy(body, 16);
             socket.write(buildResponseFrame(streamId, 0, body));
+          } else if (requestId === 3000) {
+            socket.write(buildResponseFrame(streamId, 0, Buffer.alloc(0)));
           }
         }
       });
@@ -288,6 +357,7 @@ describe("connectToHost", () => {
       result.mux.close();
       await result.transport.close();
     } finally {
+      for (const s of sockets) s.destroy();
       server.close();
     }
   });
