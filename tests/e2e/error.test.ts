@@ -4,8 +4,13 @@ import net from "node:net";
 import { setTimeout as sleep } from "node:timers/promises";
 import { Transport } from "../../src/transport/transport.ts";
 import { Multiplexer } from "../../src/transport/multiplexer.ts";
-import { File } from "../../src/api/file.ts";
-import { XRootDError } from "../../src/api/errors.ts";
+import { XRootDError, assertOkFrame } from "../../src/api/errors.ts";
+import { sendRequest } from "../../src/utils/request.ts";
+import {
+  buildOpenRequest,
+  buildReadRequest,
+  parseOpenResponse,
+} from "../../src/protocol/message.ts";
 import type { Session } from "../../src/session/handshake.ts";
 
 function buildResponseFrame(
@@ -81,10 +86,10 @@ describe("E2E: error handling", () => {
         needsAuth: false,
       };
 
-      const file = new File(mux, session);
-
       try {
-        await file.open("/nonexistent/file.txt", { flags: 0x0010 });
+        const openBuf = buildOpenRequest(0, "/nonexistent/file.txt", 0x0010);
+        const openFrame = await sendRequest(mux, openBuf);
+        assertOkFrame(openFrame);
         assert.fail("Expected XRootDError");
       } catch (err) {
         assert.ok(err instanceof XRootDError);
@@ -162,11 +167,13 @@ describe("E2E: error handling", () => {
         needsAuth: false,
       };
 
-      const file = new File(mux, session);
-      await file.open("/data/test.txt", { flags: 0x0010 });
+      const openBuf = buildOpenRequest(0, "/data/test.txt", 0x0010);
+      const openFrame = await sendRequest(mux, openBuf);
+      const { fhandle } = parseOpenResponse(openFrame.body);
 
       try {
-        await file.read(0, 100);
+        const readBuf = buildReadRequest(0, fhandle, 0, 100);
+        await sendRequest(mux, readBuf);
         assert.fail("Expected error");
       } catch (err) {
         assert.ok(err instanceof Error);

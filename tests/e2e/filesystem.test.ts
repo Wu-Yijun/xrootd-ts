@@ -252,7 +252,7 @@ async function setupSession(port: number): Promise<{
     needsAuth: false,
   };
 
-  const fs = new FileSystem(mux);
+  const fs = new FileSystem(() => mux);
   return { transport, mux, session, fs };
 }
 

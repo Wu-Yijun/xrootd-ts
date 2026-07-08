@@ -3,9 +3,15 @@ import assert from "node:assert/strict";
 import net from "node:net";
 import { Transport } from "../../src/transport/transport.ts";
 import { Multiplexer } from "../../src/transport/multiplexer.ts";
-import { File } from "../../src/api/file.ts";
 import { handshake } from "../../src/session/handshake.ts";
 import { XRootDUrl } from "../../src/url/url.ts";
+import { sendRequest } from "../../src/utils/request.ts";
+import {
+  buildOpenRequest,
+  buildReadRequest,
+  buildCloseRequest,
+  parseOpenResponse,
+} from "../../src/protocol/message.ts";
 import type { Session } from "../../src/session/handshake.ts";
 
 function buildResponseFrame(
@@ -142,20 +148,23 @@ async function runE2ETest() {
       needsAuth: false,
     };
 
-    const file = new File(mux, session);
-
     // Open
-    await file.open("/data/test.txt", { flags: 0x0010 });
-    assert.equal(file.isOpen, true);
+    const openBuf = buildOpenRequest(0, "/data/test.txt", 0x0010);
+    const openFrame = await sendRequest(mux, openBuf);
+    assert.equal(openFrame.status, 0);
+    const { fhandle } = parseOpenResponse(openFrame.body);
 
     // Read
-    const data = await file.read(0, 100);
-    const text = new TextDecoder().decode(data);
+    const readBuf = buildReadRequest(0, fhandle, 0, 100);
+    const readFrame = await sendRequest(mux, readBuf);
+    assert.equal(readFrame.status, 0);
+    const text = new TextDecoder().decode(readFrame.body);
     assert.equal(text, "Hello, XRootD!");
 
     // Close
-    await file.close();
-    assert.equal(file.isOpen, false);
+    const closeBuf = buildCloseRequest(0, fhandle);
+    const closeFrame = await sendRequest(mux, closeBuf);
+    assert.equal(closeFrame.status, 0);
 
     mux.close();
     await transport.close();
@@ -186,16 +195,23 @@ describe("E2E: read flow", () => {
         "protocolVersion should be positive",
       );
 
-      const file = new File(mux, session);
-      await file.open("/data/test.txt", { flags: 0x0010 });
-      assert.equal(file.isOpen, true);
+      // Open
+      const openBuf = buildOpenRequest(0, "/data/test.txt", 0x0010);
+      const openFrame = await sendRequest(mux, openBuf);
+      assert.equal(openFrame.status, 0);
+      const { fhandle } = parseOpenResponse(openFrame.body);
 
-      const data = await file.read(0, 100);
-      const text = new TextDecoder().decode(data);
+      // Read
+      const readBuf = buildReadRequest(0, fhandle, 0, 100);
+      const readFrame = await sendRequest(mux, readBuf);
+      assert.equal(readFrame.status, 0);
+      const text = new TextDecoder().decode(readFrame.body);
       assert.equal(text, "Hello, XRootD!");
 
-      await file.close();
-      assert.equal(file.isOpen, false);
+      // Close
+      const closeBuf = buildCloseRequest(0, fhandle);
+      const closeFrame = await sendRequest(mux, closeBuf);
+      assert.equal(closeFrame.status, 0);
 
       mux.close();
       await transport.close();

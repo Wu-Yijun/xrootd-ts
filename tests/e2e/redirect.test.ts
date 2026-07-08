@@ -3,7 +3,13 @@ import assert from "node:assert/strict";
 import net from "node:net";
 import { Transport } from "../../src/transport/transport.ts";
 import { Multiplexer } from "../../src/transport/multiplexer.ts";
-import { File } from "../../src/api/file.ts";
+import { sendRequest } from "../../src/utils/request.ts";
+import {
+  buildOpenRequest,
+  buildReadRequest,
+  buildCloseRequest,
+  parseOpenResponse,
+} from "../../src/protocol/message.ts";
 import type { Session } from "../../src/session/handshake.ts";
 
 function buildResponseFrame(
@@ -155,15 +161,22 @@ describe("E2E: redirect flow", () => {
         needsAuth: false,
       };
 
-      const file = new File(mux2!, session);
-      await file.open("/data/test.txt", { flags: 0x0010 });
-      assert.equal(file.isOpen, true);
+      // Open
+      const openBuf = buildOpenRequest(0, "/data/test.txt", 0x0010);
+      const openFrame = await sendRequest(mux2!, openBuf);
+      assert.equal(openFrame.status, 0);
+      const { fhandle } = parseOpenResponse(openFrame.body);
 
-      const data = await file.read(0, 100);
-      const text = new TextDecoder().decode(data);
+      // Read
+      const readBuf = buildReadRequest(0, fhandle, 0, 100);
+      const readFrame = await sendRequest(mux2!, readBuf);
+      assert.equal(readFrame.status, 0);
+      const text = new TextDecoder().decode(readFrame.body);
       assert.equal(text, "Redirected data");
 
-      await file.close();
+      // Close
+      const closeBuf = buildCloseRequest(0, fhandle);
+      await sendRequest(mux2!, closeBuf);
       assert.equal(serverBCalled, true);
 
       mux2!.close();
