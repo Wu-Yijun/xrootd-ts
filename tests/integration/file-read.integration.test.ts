@@ -11,6 +11,7 @@ import type { Session } from "../../src/session/handshake.ts";
 import {
   EXPECTED_FILE_CONTENTS,
   ifServerUnavailable,
+  SERVER_URL,
   TEST_FILE_PATH,
   withTimeout,
   XROOTD_HOST,
@@ -20,6 +21,13 @@ import {
 const skip = await ifServerUnavailable()
   ? "SKIP: XRootD server not available"
   : undefined;
+
+function createFileForMux(): File {
+  return new File({
+    url: XRootDUrl.parse(SERVER_URL),
+    timeout: 5000,
+  });
+}
 
 async function createConnectedClient(): Promise<{
   transport: Transport;
@@ -43,7 +51,7 @@ describe("Integration: file read flow", { skip }, () => {
     const { transport, mux, session } = await createConnectedClient();
 
     try {
-      const file = new File(mux, session);
+      const file = createFileForMux();
       await file.open(TEST_FILE_PATH);
       assert.equal(file.isOpen, true, "file should be open");
 
@@ -63,7 +71,7 @@ describe("Integration: file read flow", { skip }, () => {
     const { transport, mux, session } = await createConnectedClient();
 
     try {
-      const file = new File(mux, session);
+      const file = createFileForMux();
       await file.open(TEST_FILE_PATH);
 
       const data = await file.read(0, 5);
@@ -81,7 +89,7 @@ describe("Integration: file read flow", { skip }, () => {
     const { transport, mux, session } = await createConnectedClient();
 
     try {
-      const file = new File(mux, session);
+      const file = createFileForMux();
       await file.open(TEST_FILE_PATH);
 
       const data = await file.read(7, 6);
@@ -99,7 +107,7 @@ describe("Integration: file read flow", { skip }, () => {
     const { transport, mux, session } = await createConnectedClient();
 
     try {
-      const file = new File(mux, session);
+      const file = createFileForMux();
 
       try {
         await file.open("/data/nonexistent_file_12345.txt");
@@ -118,7 +126,7 @@ describe("Integration: file read flow", { skip }, () => {
     const { transport, mux, session } = await createConnectedClient();
 
     try {
-      const file = new File(mux, session);
+      const file = createFileForMux();
       await file.open(TEST_FILE_PATH);
 
       const info = await file.stat();
@@ -141,7 +149,7 @@ describe("Integration: file read flow", { skip }, () => {
     const { transport, mux, session } = await createConnectedClient();
 
     try {
-      const file = new File(mux, session);
+      const file = createFileForMux();
       await file.open(TEST_FILE_PATH);
 
       const chunk1 = await file.read(0, 5);
@@ -222,7 +230,7 @@ describe("Integration: file read edge cases", { skip }, () => {
   it("read with size larger than file returns available bytes", async () => {
     const { transport, mux, session } = await createConnectedClient();
     try {
-      const file = new File(mux, session);
+      const file = createFileForMux();
       await file.open(TEST_FILE_PATH);
 
       const actualSize = Buffer.byteLength(EXPECTED_FILE_CONTENTS);
@@ -245,7 +253,7 @@ describe("Integration: file read edge cases", { skip }, () => {
   it("read at offset near end returns fewer bytes", async () => {
     const { transport, mux, session } = await createConnectedClient();
     try {
-      const file = new File(mux, session);
+      const file = createFileForMux();
       await file.open(TEST_FILE_PATH);
 
       const actualSize = Buffer.byteLength(EXPECTED_FILE_CONTENTS);
@@ -265,7 +273,7 @@ describe("Integration: file read edge cases", { skip }, () => {
   it("sequential reads produce consistent results", async () => {
     const { transport, mux, session } = await createConnectedClient();
     try {
-      const file = new File(mux, session);
+      const file = createFileForMux();
       await file.open(TEST_FILE_PATH);
 
       const data1 = await file.read(0, 10);

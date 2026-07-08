@@ -9,6 +9,7 @@ import { XRootDError } from "../../src/api/errors.ts";
 import { XRootDClient } from "../../src/client.ts";
 import {
   ifServerUnavailable,
+  SERVER_URL,
   TEST_FILE_PATH,
   withTimeout,
   XROOTD_HOST,
@@ -34,7 +35,7 @@ async function createConnectedFileSystem(): Promise<{
     5000,
     "handshake with xrootd server",
   );
-  const fs = new FileSystem(mux);
+  const fs = new FileSystem(() => mux);
   return {
     transport,
     mux,

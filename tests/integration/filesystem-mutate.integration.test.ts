@@ -4,11 +4,14 @@ import { File } from "../../src/api/file.ts";
 import { FileSystem } from "../../src/api/filesystem.ts";
 import { XRootDError } from "../../src/api/errors.ts";
 import { OpenFlags } from "../../src/protocol/constants.ts";
+import { XRootDUrl } from "../../src/url/url.ts";
 import {
   closeLowLevel,
   createConnectedLowLevel,
+  ensureTestWriteDir,
   ifServerUnavailable,
   randomTestId,
+  SERVER_URL,
   TEST_WRITE_DIR,
   testFilePath,
 } from "./setup.ts";
@@ -17,12 +20,23 @@ const skip = await ifServerUnavailable()
   ? "SKIP: XRootD server not available"
   : undefined;
 
+function createFileForMux(): File {
+  return new File({
+    url: XRootDUrl.parse(SERVER_URL),
+    timeout: 5000,
+  });
+}
+
 describe("Integration: FileSystem.mkdir", { skip }, () => {
+  before(async () => {
+    await ensureTestWriteDir();
+  });
+
   it("mkdir creates a new directory", async () => {
     const { transport, mux, session } = await createConnectedLowLevel();
     const dirPath = `${TEST_WRITE_DIR}/mkdir-${randomTestId()}`;
     try {
-      const fs = new FileSystem(mux);
+      const fs = new FileSystem(() => mux);
       await fs.mkdir(dirPath);
 
       const info = await fs.stat(dirPath);
@@ -40,7 +54,7 @@ describe("Integration: FileSystem.mkdir", { skip }, () => {
     const { transport, mux, session } = await createConnectedLowLevel();
     const dirPath = `${TEST_WRITE_DIR}/mkdir-mode-conflict-${randomTestId()}`;
     try {
-      const fs = new FileSystem(mux);
+      const fs = new FileSystem(() => mux);
       await fs.mkdir(dirPath, 0o700);
       try {
         await fs.mkdir(dirPath, 0o755);
@@ -58,7 +72,7 @@ describe("Integration: FileSystem.mkdir", { skip }, () => {
     const { transport, mux, session } = await createConnectedLowLevel();
     const dirPath = `${TEST_WRITE_DIR}/mkdir-idempotent-${randomTestId()}`;
     try {
-      const fs = new FileSystem(mux);
+      const fs = new FileSystem(() => mux);
       await fs.mkdir(dirPath, 0o755);
       await fs.mkdir(dirPath, 0o755);
     } finally {
@@ -70,7 +84,7 @@ describe("Integration: FileSystem.mkdir", { skip }, () => {
     const { transport, mux, session } = await createConnectedLowLevel();
     const dirPath = `${TEST_WRITE_DIR}/mkdir-mode-${randomTestId()}`;
     try {
-      const fs = new FileSystem(mux);
+      const fs = new FileSystem(() => mux);
       await fs.mkdir(dirPath, 0o755);
 
       const info = await fs.stat(dirPath);
@@ -86,7 +100,7 @@ describe("Integration: FileSystem.rmdir", { skip }, () => {
     const { transport, mux, session } = await createConnectedLowLevel();
     const dirPath = `${TEST_WRITE_DIR}/rmdir-${randomTestId()}`;
     try {
-      const fs = new FileSystem(mux);
+      const fs = new FileSystem(() => mux);
       await fs.mkdir(dirPath);
 
       const info = await fs.stat(dirPath);
@@ -109,7 +123,7 @@ describe("Integration: FileSystem.rmdir", { skip }, () => {
   it("rmdir on non-existent path succeeds (idempotent)", async () => {
     const { transport, mux, session } = await createConnectedLowLevel();
     try {
-      const fs = new FileSystem(mux);
+      const fs = new FileSystem(() => mux);
       await fs.rmdir(`${TEST_WRITE_DIR}/nonexistent-dir-${randomTestId()}`);
     } finally {
       await closeLowLevel({ transport, mux, session });
@@ -122,12 +136,12 @@ describe("Integration: FileSystem.rm", { skip }, () => {
     const { transport, mux, session } = await createConnectedLowLevel();
     const filePath = testFilePath(`rm-${randomTestId()}.dat`);
     try {
-      const writer = new File(mux, session);
+      const writer = createFileForMux();
       await writer.open(filePath, { flags: OpenFlags.Write | OpenFlags.New });
       await writer.write(0, new TextEncoder().encode("to be deleted"));
       await writer.close();
 
-      const fs = new FileSystem(mux);
+      const fs = new FileSystem(() => mux);
       const info = await fs.stat(filePath);
       assert.ok(info.size > 0n, "file should exist before rm");
 
@@ -148,7 +162,7 @@ describe("Integration: FileSystem.rm", { skip }, () => {
   it("rm on non-existent path throws XRootDError code 3011", async () => {
     const { transport, mux, session } = await createConnectedLowLevel();
     try {
-      const fs = new FileSystem(mux);
+      const fs = new FileSystem(() => mux);
       try {
         await fs.rm(`${TEST_WRITE_DIR}/nonexistent-file-${randomTestId()}.dat`);
         assert.fail("Expected XRootDError");
@@ -168,12 +182,12 @@ describe("Integration: FileSystem.mv", { skip }, () => {
     const srcPath = testFilePath(`mv-src-${randomTestId()}.dat`);
     const dstPath = testFilePath(`mv-dst-${randomTestId()}.dat`);
     try {
-      const writer = new File(mux, session);
+      const writer = createFileForMux();
       await writer.open(srcPath, { flags: OpenFlags.Write | OpenFlags.New });
       await writer.write(0, new TextEncoder().encode("move me"));
       await writer.close();
 
-      const fs = new FileSystem(mux);
+      const fs = new FileSystem(() => mux);
       await fs.mv(srcPath, dstPath);
 
       try {
@@ -194,7 +208,7 @@ describe("Integration: FileSystem.mv", { skip }, () => {
   it("mv on non-existent source throws XRootDError code 3011", async () => {
     const { transport, mux, session } = await createConnectedLowLevel();
     try {
-      const fs = new FileSystem(mux);
+      const fs = new FileSystem(() => mux);
       const src = `${TEST_WRITE_DIR}/nonexistent-mv-${randomTestId()}.dat`;
       const dst = `${TEST_WRITE_DIR}/mv-dst-${randomTestId()}.dat`;
       try {
@@ -214,7 +228,7 @@ describe("Integration: FileSystem.readdir edge cases", { skip }, () => {
   it("readdir on non-existent path throws error", async () => {
     const { transport, mux, session } = await createConnectedLowLevel();
     try {
-      const fs = new FileSystem(mux);
+      const fs = new FileSystem(() => mux);
       try {
         await fs.readdir(`${TEST_WRITE_DIR}/nonexistent-dir-${randomTestId()}`);
         assert.fail("Expected error");
@@ -229,7 +243,7 @@ describe("Integration: FileSystem.readdir edge cases", { skip }, () => {
   it("readdir entries have correct fields (name, size, flags, mtime)", async () => {
     const { transport, mux, session } = await createConnectedLowLevel();
     try {
-      const fs = new FileSystem(mux);
+      const fs = new FileSystem(() => mux);
       const list = await fs.readdir(TEST_WRITE_DIR);
       assert.ok(list.entries.length > 0, "should have entries");
 

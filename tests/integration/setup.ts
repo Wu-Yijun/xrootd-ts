@@ -109,7 +109,7 @@ export async function ensureTestWriteDir(): Promise<void> {
   if (testDirCreated) return;
   const { transport, mux, session } = await createConnectedLowLevel();
   try {
-    const fs = new FileSystem(mux);
+    const fs = new FileSystem(() => mux);
     try {
       await fs.mkdir(TEST_WRITE_DIR);
     } catch {
