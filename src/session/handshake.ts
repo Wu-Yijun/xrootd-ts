@@ -18,7 +18,6 @@ import {
   parseSecToken,
   parseSpnPrefix,
 } from "../protocol/message.ts";
-import { createFrameReader } from "../utils/frame-reader.ts";
 import { XRootDError } from "../api/errors.ts";
 import type { SecEntity } from "../security/interface.ts";
 
@@ -64,87 +63,81 @@ export async function handshake(
 
   const transport = mux.getTransport();
 
-  // Register the frame reader BEFORE sending to avoid a race condition:
-  // the server may respond before waitForFrame() would register its handler,
-  // and the Multiplexer's onData handler (already registered) would consume
-  // and drop the frames.
-  const reader = createFrameReader(transport);
+  // Multiplexer is the sole onData listener on the transport.
+  // Control frames (streamId=0) are routed to nextControlFrame() by the
+  // Multiplexer's handleFrame, so no separate FrameReader is needed.
 
-  try {
-    await transport.send(handshakeBuf);
+  await transport.send(handshakeBuf);
 
-    // First frame: ServerInitHandShake (streamId=0, status=0, dlen=8)
-    await reader.nextFrame();
+  // First frame: ServerInitHandShake (streamId=0, status=0, dlen=8)
+  await mux.nextControlFrame();
 
-    // Second frame: kXR_ok + Protocol Response
-    const protoFrame = await reader.nextFrame();
+  // Second frame: kXR_ok + Protocol Response
+  const protoFrame = await mux.nextControlFrame();
 
-    if (protoFrame.status === ResponseStatus.Error) {
-      const err = parseErrorResponse(protoFrame.body);
-      throw new XRootDError(
-        ClientError.InternalError,
-        `Protocol handshake error: ${err.errmsg} (${err.errnum})`,
-      );
-    }
-
-    if (protoFrame.status !== ResponseStatus.Ok) {
-      throw new XRootDError(
-        ClientError.InternalError,
-        `Unexpected protocol response status: ${protoFrame.status}`,
-      );
-    }
-
-    const protoResp = parseProtocolResponse(protoFrame.body);
-
-    const loginBuf = buildLoginRequest(0, pid, username);
-    await transport.send(loginBuf);
-
-    // Third frame: kXR_ok + Login Response
-    const loginFrame = await reader.nextFrame();
-
-    if (loginFrame.status === ResponseStatus.Error) {
-      const err = parseErrorResponse(loginFrame.body);
-      throw new XRootDError(
-        ClientError.InternalError,
-        `Login error: ${err.errmsg} (${err.errnum})`,
-      );
-    }
-
-    if (loginFrame.status === ResponseStatus.Redirect) {
-      const redir = parseRedirectResponse(loginFrame.body);
-      throw new XRootDError(
-        ClientError.Redirect,
-        `Login redirect to ${redir.host}:${redir.port}`,
-      );
-    }
-
-    if (loginFrame.status !== ResponseStatus.Ok) {
-      throw new XRootDError(
-        ClientError.InternalError,
-        `Unexpected login response status: ${loginFrame.status}`,
-      );
-    }
-
-    const loginResp = parseLoginResponse(loginFrame.body);
-
-    // Parse SPN prefix from secToken (e.g. "xrootd" from "&P=krb5,xrootd/eos01...")
-    let spnPrefix: string | undefined;
-    if (loginResp.secToken) {
-      spnPrefix = parseSpnPrefix(loginResp.secToken, "krb5");
-    }
-
-    return {
-      sessid: loginResp.sessid,
-      protocolVersion: protoResp.pval,
-      seclvl: protoResp.seclvl,
-      bifReqs: protoResp.bifReqs,
-      authProtocols: loginResp.secToken
-        ? parseSecToken(loginResp.secToken)
-        : undefined,
-      needsAuth: loginResp.needsAuth,
-      spnPrefix,
-    };
-  } finally {
-    reader.close();
+  if (protoFrame.status === ResponseStatus.Error) {
+    const err = parseErrorResponse(protoFrame.body);
+    throw new XRootDError(
+      ClientError.InternalError,
+      `Protocol handshake error: ${err.errmsg} (${err.errnum})`,
+    );
   }
+
+  if (protoFrame.status !== ResponseStatus.Ok) {
+    throw new XRootDError(
+      ClientError.InternalError,
+      `Unexpected protocol response status: ${protoFrame.status}`,
+    );
+  }
+
+  const protoResp = parseProtocolResponse(protoFrame.body);
+
+  const loginBuf = buildLoginRequest(0, pid, username);
+  await transport.send(loginBuf);
+
+  // Third frame: kXR_ok + Login Response
+  const loginFrame = await mux.nextControlFrame();
+
+  if (loginFrame.status === ResponseStatus.Error) {
+    const err = parseErrorResponse(loginFrame.body);
+    throw new XRootDError(
+      ClientError.InternalError,
+      `Login error: ${err.errmsg} (${err.errnum})`,
+    );
+  }
+
+  if (loginFrame.status === ResponseStatus.Redirect) {
+    const redir = parseRedirectResponse(loginFrame.body);
+    throw new XRootDError(
+      ClientError.Redirect,
+      `Login redirect to ${redir.host}:${redir.port}`,
+    );
+  }
+
+  if (loginFrame.status !== ResponseStatus.Ok) {
+    throw new XRootDError(
+      ClientError.InternalError,
+      `Unexpected login response status: ${loginFrame.status}`,
+    );
+  }
+
+  const loginResp = parseLoginResponse(loginFrame.body);
+
+  // Parse SPN prefix from secToken (e.g. "xrootd" from "&P=krb5,xrootd/eos01...")
+  let spnPrefix: string | undefined;
+  if (loginResp.secToken) {
+    spnPrefix = parseSpnPrefix(loginResp.secToken, "krb5");
+  }
+
+  return {
+    sessid: loginResp.sessid,
+    protocolVersion: protoResp.pval,
+    seclvl: protoResp.seclvl,
+    bifReqs: protoResp.bifReqs,
+    authProtocols: loginResp.secToken
+      ? parseSecToken(loginResp.secToken)
+      : undefined,
+    needsAuth: loginResp.needsAuth,
+    spnPrefix,
+  };
 }

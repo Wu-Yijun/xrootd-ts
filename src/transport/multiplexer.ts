@@ -52,7 +52,7 @@ export class Multiplexer {
   private transport: ITransport;
   private framer: Framer;
   private pending = new Map<number, PendingRequest>();
-  private nextStreamId = 0;
+  private nextStreamId = 1; // 0 is reserved for control frames (handshake)
   private timeout = DEFAULT_TIMEOUT;
   private sweepTimer: ReturnType<typeof globalThis.setInterval> | null = null;
   private closed = false;
@@ -63,6 +63,11 @@ export class Multiplexer {
     port: number,
     pending: DetachedRequest,
   ) => Promise<void>;
+  private controlQueue: Frame[] = [];
+  private controlWaiters: Array<{
+    resolve: (frame: Frame) => void;
+    reject: (err: Error) => void;
+  }> = [];
 
   constructor(transport: ITransport, options?: MultiplexerOptions) {
     this.transport = transport;
@@ -146,6 +151,17 @@ export class Multiplexer {
 
   private handleFrame(frame: Frame): void {
     const sid = bytesToStreamId(frame.streamId);
+
+    // Control frames (streamId=0) — used during handshake and protocol negotiation.
+    // Route to control queue/waiters instead of pending map.
+    if (sid === 0) {
+      if (this.controlWaiters.length > 0) {
+        this.controlWaiters.shift()!.resolve(frame);
+      } else {
+        this.controlQueue.push(frame);
+      }
+      return;
+    }
 
     // Intercept kXR_attn (4001) responses — these carry async results
     if (frame.status === ResponseStatus.Attn) {
@@ -317,6 +333,20 @@ export class Multiplexer {
     return this.transport;
   }
 
+  /**
+   * Read the next control frame (streamId=0).
+   * Used during handshake to read ServerInitHandShake, Protocol, and Login
+   * responses without a separate onData handler.
+   */
+  nextControlFrame(): Promise<Frame> {
+    if (this.controlQueue.length > 0) {
+      return Promise.resolve(this.controlQueue.shift()!);
+    }
+    return new Promise<Frame>((resolve, reject) => {
+      this.controlWaiters.push({ resolve, reject });
+    });
+  }
+
   close(): void {
     if (this.closed) return;
     this.closed = true;
@@ -327,6 +357,14 @@ export class Multiplexer {
     }
 
     this.rejectAll(new Error("Multiplexer closed"));
+
+    // Reject pending control frame waiters (e.g. handshake awaiting response)
+    const err = new Error("Multiplexer closed");
+    for (const waiter of this.controlWaiters) {
+      waiter.reject(err);
+    }
+    this.controlWaiters.length = 0;
+    this.controlQueue.length = 0;
   }
 
   private rejectAll(err: Error): void {
