@@ -187,7 +187,7 @@ describe("Multiplexer", () => {
         requestId: number;
         body: Uint8Array;
         data?: Uint8Array;
-      } | null = null;
+      } | null = null as any;
 
       const redirectMux = new Multiplexer(transport, {
         maxRedirects: 16,

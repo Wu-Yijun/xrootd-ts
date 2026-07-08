@@ -114,7 +114,7 @@ describe("connectToHost", () => {
   });
 
   it.skip("passes username to handshake", async () => {
-    let receivedLoginPayload: Buffer | null = null;
+    let receivedLoginPayload: Buffer | null = null as Buffer | null;
 
     const server = net.createServer((socket) => {
       let buffer = Buffer.alloc(0);
