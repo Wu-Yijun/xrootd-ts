@@ -34,6 +34,14 @@ export interface FileConnectionOptions {
   maxRedirects?: number;
 }
 
+const leakDetector = new FinalizationRegistry((leakInfo: { path: string }) => {
+  console.warn(
+    `[XRootD Warning] Resource Leak Detected: A File instance for '${leakInfo.path}' ` +
+    `was garbage collected without being closed. This will cause TCP socket leaks. ` +
+    `Please ensure you call file.close() or use 'await using file = ...'.`
+  );
+});
+
 export class File {
   private readonly options: FileConnectionOptions;
   private transport: Transport | null = null;
@@ -45,6 +53,7 @@ export class File {
 
   constructor(options: FileConnectionOptions) {
     this.options = options;
+
   }
 
   get isOpen(): boolean {
@@ -86,6 +95,9 @@ export class File {
         const resp = parseOpenResponse(frame.body);
         this.fhandle = resp.fhandle;
         this._isOpen = true;
+
+        // 注册泄漏检测。注意：不要将 `this` 传给 registry，否则会导致无法被 GC
+        leakDetector.register(this, { path });
         return;
       }
 
@@ -157,6 +169,10 @@ export class File {
   }
 
   private async cleanup(): Promise<void> {
+    
+    // 正常关闭后，注销泄漏检测
+    leakDetector.unregister(this);
+
     if (this.mux) {
       this.mux.close();
       this.mux = null;
@@ -255,6 +271,13 @@ export class File {
     assertOkFrame(frame);
 
     await this.cleanup();
+  }
+
+  // 实现 asyncDispose 接口
+  async [Symbol.asyncDispose]() {
+    if (this._isOpen) {
+      await this.close();
+    }
   }
 
   async stat(): Promise<StatInfo> {

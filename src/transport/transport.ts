@@ -1,6 +1,8 @@
 import net from "node:net";
 import tls from "node:tls";
 import type { ITransport } from "./interface.ts";
+import { ClientError } from "../protocol/constants.ts";
+import { XRootDError } from "../api/errors.ts";
 
 const DEBUG = () => process?.env?.DEBUG === "true";
 
@@ -16,12 +18,30 @@ function DEBUG_to_ascii(buf: Buffer): string {
   return p.toString();
 }
 
+export interface TransportOptions {
+  /** Whether to call socket.unref() so the connection doesn't keep the process alive. @default false */
+  unrefSockets?: boolean;
+  /**
+   * Idle timeout in milliseconds. Socket is destroyed after this period of no data flow.
+   * Uses Node.js native socket.setTimeout() which auto-resets on data activity.
+   * Set to 0 to disable (not recommended). @default 30000
+   */
+  idleTimeout?: number;
+}
+
 export class Transport implements ITransport {
   private socket: net.Socket | tls.TLSSocket | null = null;
   private closeCallback: (() => void) | null = null;
   private errorCallback: ((err: Error) => void) | null = null;
   private dataHandlers: ((chunk: Buffer) => void)[] = [];
   private dataListenerInstalled = false;
+  private host: string = "";
+  private port: number = 0;
+  private options: TransportOptions;
+
+  constructor(options?: TransportOptions) {
+    this.options = options ?? {};
+  }
 
   async connect(
     host: string,
@@ -29,9 +49,31 @@ export class Transport implements ITransport {
     useTls = false,
     tlsOptions?: { rejectUnauthorized?: boolean },
   ): Promise<void> {
+    this.host = host;
+    this.port = port;
     this.socket = useTls
       ? await this.tlsConnect(host, port, tlsOptions)
       : await this.tcpConnect(host, port);
+
+    if (this.options.unrefSockets) {
+      this.socket.unref();
+    }
+
+    const timeoutMs = this.options.idleTimeout ?? 30_000;
+    if (timeoutMs > 0) {
+      this.socket.setTimeout(timeoutMs);
+      this.socket.on("timeout", () => {
+        const err = new XRootDError(
+          ClientError.Timeout,
+          `Connection idle for ${timeoutMs}ms on ${this.host}:${this.port}. ` +
+            `Socket destroyed to prevent resource leak. ` +
+            `If processing multiple files, open them just-in-time or set idleTimeout: 0 on this file.`,
+        );
+        this.destroy();
+        this.closeCallback?.();
+        this.errorCallback?.(err);
+      });
+    }
 
     this.socket.on("close", () => {
       this.closeCallback?.();
@@ -90,6 +132,7 @@ export class Transport implements ITransport {
   }
 
   destroy(): void {
+    this.socket?.removeAllListeners("timeout");
     this.socket?.destroy();
     this.socket = null;
   }
