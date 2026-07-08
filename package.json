@@ -1,9 +1,10 @@
 {
   "name": "xrootd",
-  "version": "1.0.0-beta.13",
-  "description": "A TypeScript client library for the XRootD protocol",
+  "version": "1.0.0",
+  "description": "A modern, pure native Node.js implementation of the XRootD protocol",
   "main": "dist/index.mjs",
   "types": "dist/index.d.mts",
+  "sideEffects": false,
   "exports": {
     ".": {
       "types": "./dist/index.d.mts",
@@ -29,11 +30,14 @@
     "xrootd",
     "xroot",
     "eos",
-    "client",
+    "cern",
+    "root",
     "high-energy-physics",
     "data-transfer",
-    "storage",
-    "protocol"
+    "client",
+    "typescript",
+    "pure-js",
+    "native"
   ],
   "author": "Aluria",
   "homepage": "https://github.com/Wu-Yijun/xrootd-ts",
@@ -48,7 +52,7 @@
   "license": "LGPL-3.0-or-later",
   "type": "module",
   "engines": {
-    "node": ">=22"
+    "node": ">=20"
   },
   "files": [
     "dist/index.mjs",

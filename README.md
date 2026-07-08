@@ -1,12 +1,35 @@
+
 # xrootd
 
-A TypeScript client library for the [XRootD](https://xrootd.org) protocol.
+[![npm version](https://img.shields.io/npm/v/xrootd.svg)](https://www.npmjs.com/package/xrootd)
+[![License: LGPL v3](https://img.shields.io/badge/License-LGPL_v3-blue.svg)](https://github.com/your-repo/xrootd/blob/main/LICENSE)
+[![TypeScript](https://img.shields.io/badge/TypeScript-Ready-blue.svg)](#)
 
-XRootD (eXtended ROOT Daemon) is a high-performance, fault-tolerant protocol for accessing and managing large-scale distributed storage systems. It is widely used in High Energy Physics (HEP) for data access at facilities like CERN's LHC experiments.
+A pure, native TypeScript client library for the [XRootD](https://xrootd.org) protocol. 
 
-> **🚀 v2.0.0 is Here: A Modern, Native Rewrite!**
-> ⚠️ **Breaking Changes**: Because of the fundamental architecture shift, **v2 is not API-compatible with v1**.
-> Please read our [Migration Guide (MIGRATING.md)](MIGRATING.md) to upgrade.
+🔗 **Links:** [GitHub Repository](https://github.com/Wu-Yijun/xrootd-ts) | [npm Package](https://www.npmjs.com/package/xrootd)
+
+XRootD (eXtended ROOT Daemon) is a high-performance, fault-tolerant protocol for accessing and managing large-scale distributed storage systems, widely used in High Energy Physics (HEP).
+
+
+> **🚀 v1.0.0 is Here: A Modern, Native Rewrite!**
+> We have completely rewritten the client in native Node.js to eliminate C++ compilation (`node-gyp`) issues.
+> ⚠️ **Breaking Changes**: Because of the fundamental architecture shift, **v1 is not API-compatible with v0.x**. Please read our [Migration Guide](MIGRATING.md) to upgrade.
+
+---
+
+## 🚧 Current Status & Feature Support (Phase 2)
+
+This native TypeScript implementation is currently in **Phase 2**. 
+
+* ✅ **Fully Supported & Tested:** Connection management, Authentication (host/sss/unix/kerberos), Redirect handling, Basic I/O (Read/Write/Stat), and Filesystem operations.
+* ⏳ **Work in Progress:** Advanced features like **Vectorized Reads (`readv`)** are not yet implemented in v2.
+
+**Which version should I use?**
+* If you need basic file operations with zero native dependencies: Use `npm install xrootd` (v1.x).
+* If your workflow heavily relies on advanced features like vectorized reads right now: Please use the legacy N-API C++ wrapper via `npm install xrootd@0.2.3`, and stay tuned for our upcoming updates!
+
+---
 
 ## Installation
 
@@ -19,7 +42,9 @@ npm install xrootd
 ```ts
 import { XRootDClient, OpenFlags } from 'xrootd'
 
-const client = new XRootDClient('root://server.example.com')
+// `await using` ensures both client and file are automatically closed
+// when they go out of scope, preventing TCP socket leaks.
+await using client = new XRootDClient('root://server.example.com')
 await client.connect()
 
 // List directory contents
@@ -29,19 +54,51 @@ for (const entry of list.entries) {
 }
 
 // Read a file
-const file = await client.open('/data/file.dat')
-const data = await file.read(0, 1024)
-await file.close()
+{
+  await using file = await client.open('/data/file.dat')
+  const data = await file.read(0, 1024)
+}
 
 // Write a file
-const file2 = await client.open('/data/output.dat', { flags: OpenFlags.Write | OpenFlags.New })
-await file2.write(0, new Uint8Array([72, 101, 108, 108, 111]))
-await file2.close()
-
-await client.close()
+{
+  await using file = await client.open('/data/output.dat', { flags: OpenFlags.Write | OpenFlags.New })
+  await file.write(0, new Uint8Array([72, 101, 108, 108, 111]))
+}
+// file is automatically closed here, even if an error occurs
 ```
 
 ## API
+
+### Resource Management
+
+`XRootDClient` and `File` both implement the `AsyncDisposable` interface. **Always prefer `await using`** to ensure TCP sockets are released automatically, even when errors occur:
+
+```ts
+// ✅ Recommended: automatic cleanup via `await using`
+{
+  await using client = new XRootDClient('root://server.example.com')
+  await client.connect()
+
+  {
+    await using file = await client.open('/data/file.dat')
+    const data = await file.read(0, 1024)
+  } // file.close() called automatically
+} // client.close() called automatically
+
+// ⚠️ Manual: error-prone, requires careful close() on every code path
+const client = new XRootDClient('root://server.example.com')
+await client.connect()
+// ... if an exception is thrown here, close() is skipped → socket leak
+await client.close()
+```
+
+If a `File` or `XRootDClient` is garbage-collected without being closed, a warning is logged:
+
+```
+[XRootD Warning] Resource Leak Detected: A File instance for '/data/file.dat' was garbage
+collected without being closed. This will cause TCP socket leaks.
+Please ensure you call file.close() or use 'await using file = ...'.
+```
 
 ### XRootDClient
 
@@ -50,24 +107,24 @@ High-level client that manages connection, authentication, and automatic redirec
 ```ts
 import { XRootDClient, OpenFlags } from 'xrootd'
 
-const client = new XRootDClient('root://server.example.com', {
+await using client = new XRootDClient('root://server.example.com', {
   credentials: { username: 'user', password: 'pass' },
   timeout: 30000,
   maxRedirects: 16,
 })
-
 await client.connect()
 
 // Connection state
 console.log(client.isConnected)  // boolean
 console.log(client.location)     // "root://server.example.com:1094/"
 
-// File operations
-const file = await client.open('/data/file.dat', { flags: OpenFlags.Read })
-const data = await file.read(0, 1024)
-await file.close()
+// File operations — each file gets its own TCP connection
+{
+  await using file = await client.open('/data/file.dat', { flags: OpenFlags.Read })
+  const data = await file.read(0, 1024)
+}
 
-// Filesystem operations
+// Filesystem operations (stateless, reuse client connection)
 await client.mkdir('/new/dir')
 const list = await client.readdir('/data')
 await client.mv('/old/path', '/new/path')
@@ -75,29 +132,27 @@ await client.rm('/old/file')
 await client.rmdir('/old/dir')
 
 // Metadata — two approaches
-const info1 = await client.stat('/data/file.dat')          // opens + stats + closes
+const info1 = await client.stat('/data/file.dat')          // opens + stats + closes internally
 const info2 = await client.statFilesystem('/data/file.dat') // filesystem protocol, no file open
-
-await client.close()
 ```
 
 ### File
 
 File operations for reading, writing, and managing files on XRootD servers.
 
-Obtained via `client.open()` — do not construct directly.
+Obtained via `client.open()` — do not construct directly. Each `File` opens its own TCP connection; use `await using` to ensure it is released:
 
 ```ts
-// Open a file
-const file = await client.open('/data/file.dat', { flags: OpenFlags.Read })
+{
+  await using file = await client.open('/data/file.dat', { flags: OpenFlags.Read })
 
-// Core operations
-const data: Uint8Array = await file.read(offset, size)
-const written: number = await file.write(offset, data)
-const info: StatInfo = await file.stat()
-await file.sync()
-await file.truncate(size)
-await file.close()
+  // Core operations
+  const data: Uint8Array = await file.read(offset, size)
+  const written: number = await file.write(offset, data)
+  const info: StatInfo = await file.stat()
+  await file.sync()
+  await file.truncate(size)
+} // file.close() called automatically
 ```
 
 ### FileSystem
@@ -139,18 +194,20 @@ XRootD supports multiple authentication mechanisms. The library automatically ne
 import { XRootDClient } from 'xrootd'
 
 // host authentication (server trusts client by IP)
-const client = new XRootDClient('root://server.example.com', {
+await using client = new XRootDClient('root://server.example.com', {
   credentials: { username: 'user' },
 })
+await client.connect()
+```
 
+```ts
 // SSS authentication (shared secret)
-const client = new XRootDClient('root://server.example.com', {
+await using client = new XRootDClient('root://server.example.com', {
   credentials: {
     username: 'user',
     password: 'shared-secret',
   },
 })
-
 await client.connect()
 ```
 
@@ -167,13 +224,12 @@ All errors are thrown as `XRootDError` instances:
 ```ts
 import { XRootDClient, OpenFlags, XRootDError } from 'xrootd'
 
-const client = new XRootDClient('root://server.example.com')
+await using client = new XRootDClient('root://server.example.com')
 await client.connect()
 
 try {
-  const file = await client.open('/nonexistent', { flags: OpenFlags.Read })
+  await using file = await client.open('/nonexistent', { flags: OpenFlags.Read })
   await file.read(0, 1024)
-  await file.close()
 } catch (err) {
   if (err instanceof XRootDError) {
     console.log(err.code)     // 3011 (NotFound)
@@ -181,6 +237,7 @@ try {
     console.log(err.errno)    // POSIX errno (if applicable)
   }
 }
+// file and client are automatically closed even when errors are thrown
 ```
 
 #### Common Error Codes
@@ -288,7 +345,7 @@ The client automatically handles server redirects. When a server responds with `
 4. Retries the original request
 
 ```ts
-const client = new XRootDClient('root://server.example.com', {
+await using client = new XRootDClient('root://server.example.com', {
   maxRedirects: 16, // default
 })
 ```
@@ -319,54 +376,6 @@ The library uses a three-layer architecture, simplified from the original C++ Xr
 | 5-layer abstraction | 3-layer streamlined architecture |
 | Multiple auth plugins | Pluggable SecurityProtocol interface |
 
-## Development
-
-### Prerequisites
-
-- Node.js >= 22
-- pnpm
-
-### Setup
-
-```sh
-pnpm install
-```
-
-### Mock Server
-
-A Docker-based XRootD mock server is available for integration testing:
-
-```sh
-# Start mock server
-pnpm mock-server:up
-
-# Verify it's running
-pnpm mock-server:verify
-
-# View logs
-pnpm mock-server:logs
-
-# Stop
-pnpm mock-server:down
-```
-
-### Build
-
-```sh
-pnpm build
-```
-
-### Type Check
-
-```sh
-pnpm typecheck
-```
-
-### Test
-
-```sh
-pnpm test
-```
 
 ## Documentation
 
