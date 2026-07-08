@@ -16,18 +16,18 @@ describe("HostAuth", () => {
     assert.equal(auth.name, "host");
   });
 
-  it("returns hostname as credentials", async () => {
+  it("returns fixed 'host\\0' as credentials", async () => {
     const auth = new HostAuth();
     const creds = await auth.getCredentials(defaultParams);
     const decoded = new TextDecoder().decode(creds);
-    assert.equal(decoded, "testhost.example.com");
+    assert.equal(decoded, "host\0");
   });
 
-  it('returns "unknown" when host is empty', async () => {
+  it("returns fixed 'host\\0' regardless of host param", async () => {
     const auth = new HostAuth();
     const creds = await auth.getCredentials({ ...defaultParams, host: "" });
     const decoded = new TextDecoder().decode(creds);
-    assert.equal(decoded, "unknown");
+    assert.equal(decoded, "host\0");
   });
 
   it("processChallenge marks as complete", async () => {
