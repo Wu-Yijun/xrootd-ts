@@ -90,7 +90,7 @@ export class Multiplexer {
     });
 
     this.transport.onClose(() => {
-      this.rejectAll(new Error("Connection closed"));
+      this.close();
     });
 
     this.transport.onError((err) => {
@@ -321,6 +321,10 @@ export class Multiplexer {
 
   getRedirectCount(): number {
     return this.redirectCount;
+  }
+
+  get isClosed(): boolean {
+    return this.closed;
   }
 
   updateRedirectHandler(
