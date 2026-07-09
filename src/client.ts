@@ -95,7 +95,7 @@ export class XRootDClient {
       return this.mux;
     });
 
-    leakDetector.register(this, { location: this.url.getLocation() });
+    leakDetector.register(this, { location: this.url.getLocation() }, this);
   }
 
   private async handleRedirect(

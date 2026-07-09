@@ -110,7 +110,7 @@ export class File {
         this._isOpen = true;
 
         // 注册泄漏检测。注意：不要将 `this` 传给 registry，否则会导致无法被 GC
-        leakDetector.register(this, { path });
+        leakDetector.register(this, { path }, this);
         return;
       }
 
@@ -119,7 +119,7 @@ export class File {
         `Unexpected open response status: ${frame.status}`,
       );
     } catch (err) {
-      await this.cleanup();
+      this.cleanup();
       throw err;
     }
   }
@@ -178,22 +178,21 @@ export class File {
         .then(pending.resolve)
         .catch(pending.reject);
     } catch (err) {
-      await this.cleanup();
+      this.cleanup();
       pending.reject(err as Error);
     }
   }
 
-  private async cleanup(): Promise<void> {
-    
-    // 正常关闭后，注销泄漏检测
+  private cleanup(): void {
     leakDetector.unregister(this);
+    this.isClosed = true;
 
     if (this.mux) {
       this.mux.close();
       this.mux = null;
     }
     if (this.transport) {
-      await this.transport.close();
+      this.transport.close();
       this.transport = null;
     }
     this.fhandle = null;
@@ -285,14 +284,12 @@ export class File {
 
     assertOkFrame(frame);
 
-    await this.cleanup();
+    this.cleanup();
   }
 
   // 实现 asyncDispose 接口
   async [Symbol.asyncDispose]() {
-    if (this._isOpen) {
-      await this.close();
-    }
+    await this.close();
   }
 
   async stat(): Promise<StatInfo> {
