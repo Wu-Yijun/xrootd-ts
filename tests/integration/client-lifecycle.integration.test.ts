@@ -23,7 +23,7 @@ const skip = await ifServerUnavailable()
 
 describe("Integration: XRootDClient lifecycle", { skip }, () => {
   it("connect sets isConnected = true", async () => {
-    const client = new XRootDClient(SERVER_URL);
+    await using client =new XRootDClient(SERVER_URL);
     assert.equal(
       client.isConnected,
       false,
@@ -39,7 +39,7 @@ describe("Integration: XRootDClient lifecycle", { skip }, () => {
   });
 
   it("close sets isConnected = false", async () => {
-    const client = new XRootDClient(SERVER_URL);
+    await using client =new XRootDClient(SERVER_URL);
     await withTimeout(client.connect(), 5000, "client.connect()");
     assert.equal(client.isConnected, true);
     await client.close();
@@ -51,7 +51,7 @@ describe("Integration: XRootDClient lifecycle", { skip }, () => {
   });
 
   it("location returns correct URL string", async () => {
-    const client = new XRootDClient(SERVER_URL);
+    await using client =new XRootDClient(SERVER_URL);
     await withTimeout(client.connect(), 5000, "client.connect()");
     const loc = client.location;
     assert.equal(typeof loc, "string", "location should be a string");
@@ -61,7 +61,7 @@ describe("Integration: XRootDClient lifecycle", { skip }, () => {
   });
 
   it("operations after close throw Uninitialized", async () => {
-    const client = new XRootDClient(SERVER_URL);
+    await using client =new XRootDClient(SERVER_URL);
     await withTimeout(client.connect(), 5000, "client.connect()");
     await client.close();
 
@@ -81,7 +81,7 @@ describe("Integration: XRootDClient filesystem wrappers", { skip }, () => {
   });
 
   it("mkdir → readdir verifies entry → rmdir cleans up", async () => {
-    const client = await createConnectedClient();
+    await using client =await createConnectedClient();
     const dirPath = `${TEST_WRITE_DIR}/client-mkdir-${randomTestId()}`;
     try {
       await client.mkdir(dirPath);
@@ -106,10 +106,10 @@ describe("Integration: XRootDClient filesystem wrappers", { skip }, () => {
   });
 
   it("rm removes a file", async () => {
-    const client = await createConnectedClient();
+    await using client =await createConnectedClient();
     const path = testFilePath(`client-rm-${randomTestId()}.dat`);
     try {
-      const file = await client.open(path, {
+      await using file =await client.open(path, {
         flags: OpenFlags.Write | OpenFlags.New,
       });
       await file.write(0, new TextEncoder().encode("delete me"));
@@ -130,11 +130,11 @@ describe("Integration: XRootDClient filesystem wrappers", { skip }, () => {
   });
 
   it("mv renames a file", async () => {
-    const client = await createConnectedClient();
+    await using client =await createConnectedClient();
     const src = testFilePath(`client-mv-src-${randomTestId()}.dat`);
     const dst = testFilePath(`client-mv-dst-${randomTestId()}.dat`);
     try {
-      const file = await client.open(src, {
+      await using file =await client.open(src, {
         flags: OpenFlags.Write | OpenFlags.New,
       });
       await file.write(0, new TextEncoder().encode("move me"));
@@ -160,7 +160,7 @@ describe("Integration: XRootDClient filesystem wrappers", { skip }, () => {
 
 describe("Integration: XRootDClient stat methods", { skip }, () => {
   it("stat returns StatInfo with expected fields", async () => {
-    const client = await createConnectedClient();
+    await using client =await createConnectedClient();
     try {
       const info = await client.stat(TEST_FILE_PATH);
       assert.equal(typeof info.id, "string", "id should be string");
@@ -194,7 +194,7 @@ describe("Integration: XRootDClient stat methods", { skip }, () => {
   });
 
   it("statFilesystem returns StatInfo with expected fields", async () => {
-    const client = await createConnectedClient();
+    await using client =await createConnectedClient();
     try {
       const info = await client.statFilesystem(TEST_FILE_PATH);
       assert.equal(typeof info.id, "string");
@@ -207,7 +207,7 @@ describe("Integration: XRootDClient stat methods", { skip }, () => {
   });
 
   it("stat and statFilesystem return same size for same file", async () => {
-    const client = await createConnectedClient();
+    await using client =await createConnectedClient();
     try {
       const info1 = await client.stat(TEST_FILE_PATH);
       const info2 = await client.statFilesystem(TEST_FILE_PATH);
@@ -224,7 +224,7 @@ describe("Integration: XRootDClient stat methods", { skip }, () => {
 
 describe("Integration: XRootDClient with options", { skip }, () => {
   it("timeout option: operations complete within timeout", async () => {
-    const client = new XRootDClient(SERVER_URL, { timeout: 10000 });
+    await using client =new XRootDClient(SERVER_URL, { timeout: 10000 });
     try {
       await withTimeout(client.connect(), 5000, "client.connect()");
       const info = await client.stat(TEST_FILE_PATH);
@@ -235,7 +235,7 @@ describe("Integration: XRootDClient with options", { skip }, () => {
   });
 
   it("maxRedirects option defaults to 16", async () => {
-    const client = new XRootDClient(SERVER_URL, { maxRedirects: 16 });
+    await using client =new XRootDClient(SERVER_URL, { maxRedirects: 16 });
     try {
       await withTimeout(client.connect(), 5000, "client.connect()");
       assert.equal(client.isConnected, true);
@@ -245,7 +245,7 @@ describe("Integration: XRootDClient with options", { skip }, () => {
   });
 
   it("credentials option works with no-auth server", async () => {
-    const client = new XRootDClient(SERVER_URL, {
+    await using client =new XRootDClient(SERVER_URL, {
       credentials: { username: "testuser" },
     });
     try {
@@ -257,7 +257,7 @@ describe("Integration: XRootDClient with options", { skip }, () => {
   });
 
   it("credentials with password works with no-auth server", async () => {
-    const client = new XRootDClient(SERVER_URL, {
+    await using client =new XRootDClient(SERVER_URL, {
       credentials: { username: "testuser", password: "testpass" },
     });
     try {

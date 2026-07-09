@@ -33,7 +33,7 @@ const skip = await ifServerUnavailable()
 
 describe("Integration: StatInfo type validation", { skip }, () => {
   it("stat returns StatInfo with correct types for all fields", async () => {
-    const client = await createConnectedClient();
+    await using client =await createConnectedClient();
     try {
       const info = await client.stat(TEST_FILE_PATH);
 
@@ -69,7 +69,7 @@ describe("Integration: StatInfo type validation", { skip }, () => {
   });
 
   it("stat on directory sets isDirectory = true", async () => {
-    const client = await createConnectedClient();
+    await using client =await createConnectedClient();
     try {
       const info = await client.statFilesystem("/data/test");
       assert.equal(info.isDirectory, true, "should be a directory");
@@ -79,7 +79,7 @@ describe("Integration: StatInfo type validation", { skip }, () => {
   });
 
   it("stat on file sets isDirectory = false", async () => {
-    const client = await createConnectedClient();
+    await using client =await createConnectedClient();
     try {
       const info = await client.stat(TEST_FILE_PATH);
       assert.equal(info.isDirectory, false, "should not be a directory");
@@ -121,7 +121,7 @@ describe("Integration: StatInfo type validation", { skip }, () => {
 
 describe("Integration: DirectoryEntry type validation", { skip }, () => {
   it("readdir entries have correct types", async () => {
-    const client = await createConnectedClient();
+    await using client =await createConnectedClient();
     try {
       const list = await client.readdir("/data/test");
       assert.ok(list.entries.length > 0, "should have entries");
@@ -139,7 +139,7 @@ describe("Integration: DirectoryEntry type validation", { skip }, () => {
   });
 
   it("readdir name matches requested path", async () => {
-    const client = await createConnectedClient();
+    await using client =await createConnectedClient();
     try {
       const list = await client.readdir("/data/test");
       assert.equal(

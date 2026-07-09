@@ -123,7 +123,7 @@ describe("Integration: FileSystem.readdir", { skip }, () => {
 
 describe("Integration: XRootDClient filesystem operations", { skip }, () => {
   it("client.statFilesystem returns valid info", async () => {
-    const client = new XRootDClient(`root://${XROOTD_HOST}:${XROOTD_PORT}/`);
+    await using client =new XRootDClient(`root://${XROOTD_HOST}:${XROOTD_PORT}/`);
     try {
       await withTimeout(client.connect(), 5000, "client.connect()");
       const info = await client.statFilesystem(TEST_FILE_PATH);
@@ -135,7 +135,7 @@ describe("Integration: XRootDClient filesystem operations", { skip }, () => {
   });
 
   it("client.readdir returns directory listing", async () => {
-    const client = new XRootDClient(`root://${XROOTD_HOST}:${XROOTD_PORT}/`);
+    await using client =new XRootDClient(`root://${XROOTD_HOST}:${XROOTD_PORT}/`);
     try {
       await withTimeout(client.connect(), 5000, "client.connect()");
       const list = await client.readdir("/data/test");

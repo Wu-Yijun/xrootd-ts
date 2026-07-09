@@ -67,7 +67,7 @@ describe("Integration: handshake", { skip }, () => {
   });
 
   it("XRootDClient.connect() completes full handshake", async () => {
-    const client = new XRootDClient(
+    await using client =new XRootDClient(
       `root://${XROOTD_HOST}:${XROOTD_PORT}/`,
     );
 

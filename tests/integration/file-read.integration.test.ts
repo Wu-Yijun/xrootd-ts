@@ -170,7 +170,7 @@ describe("Integration: file read flow", { skip }, () => {
 
 describe("Integration: XRootDClient file operations", { skip }, () => {
   it("client.open -> read -> close", async () => {
-    const client = new XRootDClient(`root://${XROOTD_HOST}:${XROOTD_PORT}/`);
+    await using client =new XRootDClient(`root://${XROOTD_HOST}:${XROOTD_PORT}/`);
 
     try {
       await withTimeout(client.connect(), 5000, "client.connect()");
@@ -192,7 +192,7 @@ describe("Integration: XRootDClient file operations", { skip }, () => {
   });
 
   it("client.stat returns valid info", async () => {
-    const client = new XRootDClient(`root://${XROOTD_HOST}:${XROOTD_PORT}/`);
+    await using client =new XRootDClient(`root://${XROOTD_HOST}:${XROOTD_PORT}/`);
 
     try {
       await withTimeout(client.connect(), 5000, "client.connect()");
@@ -205,7 +205,7 @@ describe("Integration: XRootDClient file operations", { skip }, () => {
   });
 
   it("client.open non-existent file throws", async () => {
-    const client = new XRootDClient(`root://${XROOTD_HOST}:${XROOTD_PORT}/`);
+    await using client =new XRootDClient(`root://${XROOTD_HOST}:${XROOTD_PORT}/`);
 
     try {
       await withTimeout(client.connect(), 5000, "client.connect()");

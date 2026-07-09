@@ -133,7 +133,7 @@ describe("Integration: File.write", { skip }, () => {
   it("write on closed file throws XRootDError code 3004", async () => {
     const { transport, mux, session } = await createConnectedLowLevel();
     try {
-      const file = createFileForMux();
+      await using file =createFileForMux();
       try {
         await file.write(0, new TextEncoder().encode("test"));
         assert.fail("Expected XRootDError");
@@ -259,7 +259,7 @@ describe("Integration: File.sync and truncate", { skip }, () => {
   it("sync on closed file throws XRootDError code 3004", async () => {
     const { transport, mux, session } = await createConnectedLowLevel();
     try {
-      const file = createFileForMux();
+      await using file =createFileForMux();
       try {
         await file.sync();
         assert.fail("Expected XRootDError");
@@ -304,7 +304,7 @@ describe("Integration: File.sync and truncate", { skip }, () => {
   it("truncate on closed file throws XRootDError code 3004", async () => {
     const { transport, mux, session } = await createConnectedLowLevel();
     try {
-      const file = createFileForMux();
+      await using file =createFileForMux();
       try {
         await file.truncate(0);
         assert.fail("Expected XRootDError");
@@ -322,7 +322,7 @@ describe("Integration: File state errors", { skip }, () => {
   it("read on closed file throws XRootDError code 3004", async () => {
     const { transport, mux, session } = await createConnectedLowLevel();
     try {
-      const file = createFileForMux();
+      await using file =createFileForMux();
       try {
         await file.read(0, 10);
         assert.fail("Expected XRootDError");
@@ -338,7 +338,7 @@ describe("Integration: File state errors", { skip }, () => {
   it("stat on closed file throws XRootDError code 3004", async () => {
     const { transport, mux, session } = await createConnectedLowLevel();
     try {
-      const file = createFileForMux();
+      await using file =createFileForMux();
       try {
         await file.stat();
         assert.fail("Expected XRootDError");
@@ -395,7 +395,7 @@ describe("Integration: XRootDClient write flow", { skip }, () => {
   });
 
   it("client.open with Write → write → close → read back", async () => {
-    const client = await createConnectedClient();
+    await using client =await createConnectedClient();
     const path = testFilePath(`client-write-${randomTestId()}.dat`);
     try {
       await using file = await client.open(path, {
