@@ -40,14 +40,14 @@ describe("Integration: File.write", { skip }, () => {
     const { transport, mux, session } = await createConnectedLowLevel();
     const path = testFilePath(`write-basic-${randomTestId()}.dat`);
     try {
-      const file = createFileForMux();
+      await using file = createFileForMux();
       await file.open(path, { flags: OpenFlags.Write | OpenFlags.New });
       const data = new TextEncoder().encode("Hello, XRootD write!");
       const written = await file.write(0, data);
       assert.ok(written > 0, "should report bytes written");
       await file.close();
 
-      const file2 = createFileForMux();
+      await using file2 = createFileForMux();
       await file2.open(path, { flags: OpenFlags.Read });
       const info = await file2.stat();
       assert.equal(
@@ -66,13 +66,13 @@ describe("Integration: File.write", { skip }, () => {
     const path = testFilePath(`write-readback-${randomTestId()}.dat`);
     const content = "Round-trip test: \u4e2d\u6587 + special chars: @#$%^&*()";
     try {
-      const file = createFileForMux();
+      await using file = createFileForMux();
       await file.open(path, { flags: OpenFlags.Write | OpenFlags.New });
       const data = new TextEncoder().encode(content);
       await file.write(0, data);
       await file.close();
 
-      const file2 = createFileForMux();
+      await using file2 = createFileForMux();
       await file2.open(path, { flags: OpenFlags.Read });
       const readData = await file2.read(0, data.byteLength);
       const text = new TextDecoder().decode(readData);
@@ -87,13 +87,13 @@ describe("Integration: File.write", { skip }, () => {
     const { transport, mux, session } = await createConnectedLowLevel();
     const path = testFilePath(`write-offset-${randomTestId()}.dat`);
     try {
-      const file = createFileForMux();
+      await using file = createFileForMux();
       await file.open(path, { flags: OpenFlags.Write | OpenFlags.New });
       await file.write(0, new TextEncoder().encode("AAAA"));
       await file.write(2, new TextEncoder().encode("BB"));
       await file.close();
 
-      const file2 = createFileForMux();
+      await using file2 = createFileForMux();
       await file2.open(path, { flags: OpenFlags.Read });
       const data = await file2.read(0, 4);
       const text = new TextDecoder().decode(data);
@@ -108,14 +108,14 @@ describe("Integration: File.write", { skip }, () => {
     const { transport, mux, session } = await createConnectedLowLevel();
     const path = testFilePath(`write-multi-${randomTestId()}.dat`);
     try {
-      const file = createFileForMux();
+      await using file = createFileForMux();
       await file.open(path, { flags: OpenFlags.Write | OpenFlags.New });
       await file.write(0, new TextEncoder().encode("Part1-"));
       await file.write(6, new TextEncoder().encode("Part2-"));
       await file.write(12, new TextEncoder().encode("Part3"));
       await file.close();
 
-      const file2 = createFileForMux();
+      await using file2 = createFileForMux();
       await file2.open(path, { flags: OpenFlags.Read });
       const data = await file2.read(0, 17);
       const text = new TextDecoder().decode(data);
@@ -156,17 +156,17 @@ describe("Integration: File.open with Write flags", { skip }, () => {
     const { transport, mux, session } = await createConnectedLowLevel();
     const path = testFilePath(`flags-write-${randomTestId()}.dat`);
     try {
-      const setup = createFileForMux();
+      await using setup = createFileForMux();
       await setup.open(path, { flags: OpenFlags.Write | OpenFlags.New });
       await setup.write(0, new TextEncoder().encode("original"));
       await setup.close();
 
-      const file = createFileForMux();
+      await using file = createFileForMux();
       await file.open(path, { flags: OpenFlags.Write });
       await file.write(0, new TextEncoder().encode("updated"));
       await file.close();
 
-      const reader = createFileForMux();
+      await using reader = createFileForMux();
       await reader.open(path, { flags: OpenFlags.Read });
       const data = await reader.read(0, 7);
       assert.equal(new TextDecoder().decode(data), "updated");
@@ -180,12 +180,12 @@ describe("Integration: File.open with Write flags", { skip }, () => {
     const { transport, mux, session } = await createConnectedLowLevel();
     const path = testFilePath(`flags-new-${randomTestId()}.dat`);
     try {
-      const file = createFileForMux();
+      await using file = createFileForMux();
       await file.open(path, { flags: OpenFlags.Write | OpenFlags.New });
       await file.write(0, new TextEncoder().encode("created"));
       await file.close();
 
-      const reader = createFileForMux();
+      await using reader = createFileForMux();
       await reader.open(path, { flags: OpenFlags.Read });
       const data = await reader.read(0, 7);
       assert.equal(new TextDecoder().decode(data), "created");
@@ -199,17 +199,17 @@ describe("Integration: File.open with Write flags", { skip }, () => {
     const { transport, mux, session } = await createConnectedLowLevel();
     const path = testFilePath(`flags-append-${randomTestId()}.dat`);
     try {
-      const setup = createFileForMux();
+      await using setup = createFileForMux();
       await setup.open(path, { flags: OpenFlags.Write | OpenFlags.New });
       await setup.write(0, new TextEncoder().encode("Hello"));
       await setup.close();
 
-      const file = createFileForMux();
+      await using file = createFileForMux();
       await file.open(path, { flags: OpenFlags.Write | OpenFlags.Append });
       await file.write(5, new TextEncoder().encode(" World"));
       await file.close();
 
-      const reader = createFileForMux();
+      await using reader = createFileForMux();
       await reader.open(path, { flags: OpenFlags.Read });
       const info = await reader.stat();
       assert.equal(info.size, 11n, "file should be 11 bytes after append");
@@ -231,12 +231,12 @@ describe("Integration: File.sync and truncate", { skip }, () => {
     const { transport, mux, session } = await createConnectedLowLevel();
     const path = testFilePath(`sync-${randomTestId()}.dat`);
     try {
-      const setup = createFileForMux();
+      await using setup = createFileForMux();
       await setup.open(path, { flags: OpenFlags.Write | OpenFlags.New });
       await setup.write(0, new TextEncoder().encode("sync test"));
       await setup.close();
 
-      const file = createFileForMux();
+      await using file = createFileForMux();
       await file.open(path, { flags: OpenFlags.Read });
       try {
         await file.sync();
@@ -276,12 +276,12 @@ describe("Integration: File.sync and truncate", { skip }, () => {
     const { transport, mux, session } = await createConnectedLowLevel();
     const path = testFilePath(`truncate-${randomTestId()}.dat`);
     try {
-      const setup = createFileForMux();
+      await using setup = createFileForMux();
       await setup.open(path, { flags: OpenFlags.Write | OpenFlags.New });
       await setup.write(0, new TextEncoder().encode("truncate test data"));
       await setup.close();
 
-      const file = createFileForMux();
+      await using file = createFileForMux();
       await file.open(path, { flags: OpenFlags.Read });
       try {
         await file.truncate(0);
@@ -355,7 +355,7 @@ describe("Integration: File state errors", { skip }, () => {
     const { transport, mux, session } = await createConnectedLowLevel();
     const path = testFilePath(`double-open-${randomTestId()}.dat`);
     try {
-      const file = createFileForMux();
+      await using file = createFileForMux();
       await file.open(path, { flags: OpenFlags.Write | OpenFlags.New });
       try {
         await file.open(path, { flags: OpenFlags.Read });
@@ -372,7 +372,7 @@ describe("Integration: File state errors", { skip }, () => {
   it("close is idempotent (no error on second close)", async () => {
     const { transport, mux, session } = await createConnectedLowLevel();
     try {
-      const file = createFileForMux();
+      await using file = createFileForMux();
       await file.open(TEST_WRITE_DIR + "/dummy", { flags: OpenFlags.Read });
       await file.close();
       await file.close(); // should not throw
@@ -398,14 +398,14 @@ describe("Integration: XRootDClient write flow", { skip }, () => {
     const client = await createConnectedClient();
     const path = testFilePath(`client-write-${randomTestId()}.dat`);
     try {
-      const file = await client.open(path, {
+      await using file = await client.open(path, {
         flags: OpenFlags.Write | OpenFlags.New,
       });
       const data = new TextEncoder().encode("client write test");
       await file.write(0, data);
       await file.close();
 
-      const reader = await client.open(path, { flags: OpenFlags.Read });
+      await using reader = await client.open(path, { flags: OpenFlags.Read });
       const readData = await reader.read(0, data.byteLength);
       assert.equal(
         new TextDecoder().decode(readData),
