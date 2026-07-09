@@ -56,6 +56,7 @@ export class XRootDClient {
   private session: Session | null = null;
   private fs: FileSystem | null = null;
   private redirectCount = 0;
+  private destroyed = false;
 
   constructor(url: string, options: XRootDClientOptions = {}) {
     this.url = XRootDUrl.parse(url);
@@ -230,6 +231,7 @@ export class XRootDClient {
   }
 
   async close(): Promise<void> {
+    this.destroyed = true;
     leakDetector.unregister(this);
 
     if (this.mux) {
@@ -251,7 +253,7 @@ export class XRootDClient {
   }
 
   get isConnected(): boolean {
-    return this.session !== null;
+    return !this.destroyed && this.session !== null;
   }
 
   get location(): string {
@@ -259,6 +261,10 @@ export class XRootDClient {
   }
 
   private async ensureConnectedAsync(): Promise<Multiplexer> {
+    if (this.destroyed) {
+      throw new XRootDError(ClientError.Uninitialized, "Client has been closed");
+    }
+
     if (this.mux && !this.mux.isClosed) {
       return this.mux;
     }
