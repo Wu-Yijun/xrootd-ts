@@ -136,7 +136,7 @@ describe("Integration: FileSystem.rm", { skip }, () => {
     const { transport, mux, session } = await createConnectedLowLevel();
     const filePath = testFilePath(`rm-${randomTestId()}.dat`);
     try {
-      const writer = createFileForMux();
+      await using writer = createFileForMux();
       await writer.open(filePath, { flags: OpenFlags.Write | OpenFlags.New });
       await writer.write(0, new TextEncoder().encode("to be deleted"));
       await writer.close();
@@ -182,7 +182,7 @@ describe("Integration: FileSystem.mv", { skip }, () => {
     const srcPath = testFilePath(`mv-src-${randomTestId()}.dat`);
     const dstPath = testFilePath(`mv-dst-${randomTestId()}.dat`);
     try {
-      const writer = createFileForMux();
+      await using writer = createFileForMux();
       await writer.open(srcPath, { flags: OpenFlags.Write | OpenFlags.New });
       await writer.write(0, new TextEncoder().encode("move me"));
       await writer.close();
